@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OBD Brasil</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#1a1a19">
 <style>
   :root {
     --bg: #fcfcfb; --panel: #f1f0ec; --line: #dddcd6;
@@ -57,6 +61,10 @@
   .badge.pending { color: var(--warning); }
   .badge.permanent { color: var(--text2); }
   .ok { color: var(--good); }
+  .badge.own { color: var(--series); }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 10px 20px; margin: 0; }
+  dt { color: var(--text2); }
+  dd { margin: 0; font: 600 17px ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
   @media (max-width: 600px) { .charts { grid-template-columns: 1fr; } h1 { flex-basis: 100%; } }
 </style>
 </head>
@@ -83,6 +91,7 @@
   <button data-tab="painel" aria-selected="true">Painel</button>
   <button data-tab="graficos">Gráficos</button>
   <button data-tab="dtc">Códigos de erro</button>
+  <button data-tab="veiculo">Veículo</button>
 </nav>
 <main>
   <section id="painel">
@@ -101,8 +110,22 @@
     <div class="row">
       <button id="bRead" disabled>Ler códigos</button>
       <button id="bClear" disabled>Apagar códigos / luz de injeção</button>
+      <label class="hint">Fabricante <select id="make"><option value="">Genérico</option></select></label>
     </div>
     <div id="dtcOut"><p class="hint">Conecte para ler os códigos de falha armazenados, pendentes e permanentes.</p></div>
+  </section>
+  <section id="veiculo" hidden>
+    <dl>
+      <dt>Chassi (VIN)</dt><dd id="vVin">—</dd>
+      <dt>Fabricante</dt><dd id="vBrand">—</dd>
+      <dt>País de fabricação</dt><dd id="vCountry">—</dd>
+      <dt>Ano-modelo</dt><dd id="vYear">—</dd>
+      <dt>Odômetro (ECU)</dt><dd id="vOdo">—</dd>
+      <dt>Rodado desde que os códigos foram apagados</dt><dd id="vClr">—</dd>
+      <dt>Rodado com a luz de injeção acesa</dt><dd id="vMil">—</dd>
+      <dt>Viagem atual (calculada pela velocidade)</dt><dd id="vTrip">—</dd>
+    </dl>
+    <p class="hint">O odômetro só aparece em carros cuja central informa o PID A6 (geralmente modelos recentes). A quilometragem do painel fica no módulo do painel de instrumentos, que não é acessível pelo OBD genérico.</p>
   </section>
 </main>
 <script type="module" src="app.js"></script>

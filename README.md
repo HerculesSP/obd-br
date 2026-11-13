@@ -11,6 +11,14 @@ python3 -m http.server 8000
 
 Web Serial e Web Bluetooth exigem Chrome/Edge e `localhost` ou HTTPS. Clique em **Demonstração** para testar sem carro.
 
+### Instalar no celular (PWA)
+
+1. Publique a pasta num host com HTTPS (GitHub Pages, Netlify, Cloudflare Pages etc.). É só copiar os arquivos, não tem build.
+2. Abra a página no Chrome do Android e escolha **⋮ → Instalar app**.
+3. O app abre em tela cheia, funciona offline e mantém a tela acesa enquanto está conectado.
+
+No celular use adaptador **Bluetooth LE**, ou **USB via cabo OTG** (o Chrome do Android tem Web Serial desde a versão 136; se o seu não tiver, o botão USB fica desativado).
+
 ## Adaptadores
 
 | Adaptador | Botão | Observação |
@@ -34,6 +42,10 @@ No Android só funciona BLE. Adaptadores de Bluetooth clássico não aparecem no
 - **Painel**: toque num mostrador para incluí-lo ou removê-lo dos gráficos. Mostradores e sensores em gráfico são lidos a cada ciclo; os demais, em rodízio.
 - **Gráficos**: janela de 30 s, 1 min ou 5 min, com cursor para inspecionar valores. Use **Exportar CSV** para baixar o log da sessão (abre no Excel em português).
 - **Códigos de erro**: lê os códigos armazenados (modo 03), pendentes (07) e permanentes (0A). **Apagar** (modo 04) desliga a luz de injeção e zera os monitores de prontidão.
+  - **Fabricante**: é detectado pelo chassi e pode ser trocado manualmente. Códigos P1xxx têm descrição própria para VW/Audi, Chevrolet/GM, Ford, Toyota, Honda, Nissan e Hyundai/Kia (KSDS). O significado pode variar por modelo e ano.
+  - **Fiat/Jeep, Renault e Peugeot/Citroën**: não há lista P1 confiável para OBD genérico, porque os códigos variam por central (Marelli, Bosch, Continental). Nesses carros o app mostra o sistema afetado (ignição, injeção, emissões…) e indica que é código do fabricante.
+- **Veículo**: mostra o chassi (VIN, modo 09), o fabricante, o país, o ano-modelo, o odômetro (PID A6, só em centrais recentes), a distância rodada desde a limpeza dos códigos e com a luz acesa, e a viagem atual calculada pela velocidade.
+  - A quilometragem do painel fica no módulo do painel de instrumentos, que não é acessível pelo OBD genérico. Carros antes de 2019 dificilmente informam o odômetro.
 
 ## Testes
 
@@ -46,3 +58,4 @@ node test.mjs
 - `obd.js`: ELM327, tabela de PIDs, parsers e transportes (Serial, BLE e simulador)
 - `dtc.js`: descrições de DTC em português
 - `app.js` / `index.html`: interface
+- `manifest.webmanifest`, `sw.js`, `icon*`: PWA (instalável e offline)

@@ -37,6 +37,6 @@ await elm.t.open();
 const info = await elm.init();
 assert.ok(elm.isCan && info.supported.includes('52'));
 assert.ok((await elm.read('0C')) >= 850);
-assert.deepEqual(await elm.dtcs('03'), ['P0171', 'P0301', 'P0420']);
+assert.deepEqual(await elm.dtcs('03'), ['P0171', 'P0301', 'P0420', 'P1136']);
 assert.equal(await elm.vin(), '9BWAG45U3LP012345');
 console.log('ok');

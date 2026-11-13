@@ -238,7 +238,7 @@ export class DemoTransport {
     if (cmd === 'ATDP') return 'AUTO, ISO 15765-4 (CAN 11/500)';
     if (cmd === 'ATDPN') return 'A6';
     if (cmd.startsWith('AT')) return 'OK';
-    if (cmd === '03') return '4303017103010420'; // P0171, P0301, P0420
+    if (cmd === '03') return '43040171030104201136'; // P0171, P0301, P0420, P1136
     if (cmd === '07') return '47010133';
     if (cmd === '0A') return '4A00';
     if (cmd === '04') return '44';

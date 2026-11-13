@@ -1,5 +1,5 @@
-import { Elm, PIDS, SerialTransport, BleTransport, DemoTransport } from './obd.js';
-import { describe } from './dtc.js';
+import { Elm, PIDS, SerialTransport, BleTransport, DemoTransport, decodeVin } from './obd.js';
+import { describe, MAKE_NAMES } from './dtc.js';
 
 const $ = s => document.querySelector(s);
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
@@ -9,6 +9,10 @@ const MAX_LOG = 200000; // ponytail: log em memória; gravar em IndexedDB se ses
 let elm = null, running = false, supported = [];
 const hist = {}, last = {}, log = [], hover = {};
 const charted = new Set(Object.keys(GAUGES));
+let trip = 0, lastSpeed = null;
+
+navigator.serviceWorker?.register('sw.js').catch(() => {});
+for (const [k, v] of Object.entries(MAKE_NAMES)) $('#make').add(new Option(v, k));
 
 const status = s => { $('#status').textContent = s; };
 const DP = { V: 2, 'g/s': 1, 'L/h': 1 };
@@ -32,6 +36,7 @@ async function connect(t) {
     supported = info.supported;
     status(`${info.version} · ${info.protocol} · bateria ${info.voltage} · ${supported.length} sensores`);
     buildTiles();
+    await readVehicle();
     navigator.wakeLock?.request('screen').catch(() => {});
     running = true;
     loop();
@@ -73,7 +78,24 @@ async function loop() {
   }
 }
 
+async function readVehicle() {
+  const vin = await elm.vin();
+  if (!vin) { $('#vVin').textContent = 'Não informado pela central'; return; }
+  const d = decodeVin(vin);
+  $('#vVin').textContent = vin;
+  $('#vBrand').textContent = d.brand;
+  $('#vCountry').textContent = d.country;
+  $('#vYear').textContent = d.year ?? '—';
+  if (d.make) $('#make').value = d.make;
+}
+
+const km = v => v == null ? '—' : v.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' km';
+
 function record(pid, v) {
+  if (pid === '0D') { // integra velocidade (km/h) no tempo -> km
+    if (lastSpeed) trip += (lastSpeed[1] + v) / 2 * (Date.now() - lastSpeed[0]) / 3.6e6;
+    lastSpeed = [Date.now(), v];
+  }
   last[pid] = v;
   if (typeof v === 'number') (hist[pid] ??= []).push([Date.now(), v]);
   if (hist[pid]?.length > 3000) hist[pid].shift();
@@ -103,6 +125,10 @@ function render() {
   for (const [pid, red] of Object.entries(GAUGES)) gauge($('#g' + pid), pid, last[pid], red);
   for (const pid of supported) if (pid in last) $('#t' + pid + ' b').textContent = fmt(pid, last[pid]);
   if (!$('#graficos').hidden) for (const pid of charted) chart(pid);
+  $('#vOdo').textContent = km(last.A6);
+  $('#vClr').textContent = km(last['31']);
+  $('#vMil').textContent = km(last['21']);
+  $('#vTrip').textContent = km(trip);
 }
 
 function fit(cv) {
@@ -222,7 +248,10 @@ $('#bRead').onclick = async () => {
   $('#dtcOut').textContent = 'Lendo…';
   const rows = [];
   for (const [mode, cls, label] of KINDS)
-    for (const code of await elm.dtcs(mode)) rows.push(`<tr><td class="code">${code}</td><td>${describe(code)}</td><td><span class="badge ${cls}">${label}</span></td></tr>`);
+    for (const code of await elm.dtcs(mode)) {
+      const d = describe(code, $('#make').value);
+      rows.push(`<tr><td class="code">${code}</td><td>${d.text}</td><td><span class="badge ${cls}">${label}</span>${d.own ? ' <span class="badge own" title="O significado pode variar por modelo e ano">Fabricante</span>' : ''}</td></tr>`);
+    }
   $('#dtcOut').innerHTML = rows.length
     ? `<table><tr><th>Código</th><th>Descrição</th><th>Tipo</th></tr>${rows.join('')}</table>`
     : '<p class="ok">✔ Nenhum código de falha encontrado.</p>';
