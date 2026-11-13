@@ -11,6 +11,7 @@ export const PIDS = {
   '05': { name: 'Temp. arrefecimento', unit: '°C', min: -40, max: 130, f: a => a - 40 },
   '06': { name: 'Ajuste curto (STFT) B1', unit: '%', min: -25, max: 25, f: a => a / 1.28 - 100 },
   '07': { name: 'Ajuste longo (LTFT) B1', unit: '%', min: -25, max: 25, f: a => a / 1.28 - 100 },
+  '0A': { name: 'Pressão de combustível', unit: 'kPa', min: 0, max: 765, f: a => 3 * a },
   '0B': { name: 'Pressão coletor (MAP)', unit: 'kPa', min: 0, max: 255, f: a => a },
   '0C': { name: 'Rotação', unit: 'rpm', min: 0, max: 8000, f: (a, b) => (256 * a + b) / 4 },
   '0D': { name: 'Velocidade', unit: 'km/h', min: 0, max: 220, f: a => a },
@@ -21,16 +22,38 @@ export const PIDS = {
   '14': { name: 'Sonda lambda B1S1', unit: 'V', min: 0, max: 1.275, f: a => a / 200 },
   '15': { name: 'Sonda lambda B1S2', unit: 'V', min: 0, max: 1.275, f: a => a / 200 },
   '1F': { name: 'Tempo motor ligado', unit: 's', min: 0, max: 65535, f: (a, b) => 256 * a + b },
+  '22': { name: 'Pressão galeria (rel. vácuo)', unit: 'kPa', min: 0, max: 5177, f: (a, b) => 0.079 * (256 * a + b) },
+  '23': { name: 'Pressão galeria combustível', unit: 'kPa', min: 0, max: 655350, f: (a, b) => 10 * (256 * a + b) },
+  '24': { name: 'Lambda B1S1 (banda larga)', unit: 'λ', min: 0, max: 2, f: (a, b) => 2 * (256 * a + b) / 65536 },
+  '2C': { name: 'EGR comandada', unit: '%', min: 0, max: 100, f: a => a * 100 / 255 },
+  '2E': { name: 'Purga do cânister comandada', unit: '%', min: 0, max: 100, f: a => a * 100 / 255 },
+  '30': { name: 'Aquecimentos desde limpeza DTC', unit: '', min: 0, max: 255, f: a => a },
   '21': { name: 'Distância com MIL acesa', unit: 'km', min: 0, max: 65535, f: (a, b) => 256 * a + b },
   '2F': { name: 'Nível de combustível', unit: '%', min: 0, max: 100, f: a => a * 100 / 255 },
   '31': { name: 'Distância desde limpeza DTC', unit: 'km', min: 0, max: 65535, f: (a, b) => 256 * a + b },
+  '3C': { name: 'Temp. catalisador B1S1', unit: '°C', min: -40, max: 1000, f: (a, b) => (256 * a + b) / 10 - 40 },
   '33': { name: 'Pressão barométrica', unit: 'kPa', min: 0, max: 255, f: a => a },
   '42': { name: 'Tensão do módulo', unit: 'V', min: 0, max: 16, f: (a, b) => (256 * a + b) / 1000 },
+  '43': { name: 'Carga absoluta', unit: '%', min: 0, max: 100, f: (a, b) => (256 * a + b) * 100 / 255 },
+  '44': { name: 'Lambda comandado', unit: 'λ', min: 0, max: 2, f: (a, b) => 2 * (256 * a + b) / 65536 },
+  '45': { name: 'Posição relativa borboleta', unit: '%', min: 0, max: 100, f: a => a * 100 / 255 },
+  '47': { name: 'Posição borboleta B', unit: '%', min: 0, max: 100, f: a => a * 100 / 255 },
+  '49': { name: 'Pedal acelerador D', unit: '%', min: 0, max: 100, f: a => a * 100 / 255 },
+  '4A': { name: 'Pedal acelerador E', unit: '%', min: 0, max: 100, f: a => a * 100 / 255 },
+  '4C': { name: 'Atuador borboleta comandado', unit: '%', min: 0, max: 100, f: a => a * 100 / 255 },
+  '4D': { name: 'Tempo com MIL acesa', unit: 'min', min: 0, max: 65535, f: (a, b) => 256 * a + b },
+  '4E': { name: 'Tempo desde limpeza DTC', unit: 'min', min: 0, max: 65535, f: (a, b) => 256 * a + b },
   '46': { name: 'Temp. ambiente', unit: '°C', min: -40, max: 60, f: a => a - 40 },
   '51': { name: 'Tipo de combustível', unit: '', text: true, f: a => FUEL[a] ?? `Tipo ${a}` },
   '52': { name: 'Etanol no tanque (flex)', unit: '%', min: 0, max: 100, f: a => a * 100 / 255 },
+  '59': { name: 'Pressão galeria (absoluta)', unit: 'kPa', min: 0, max: 655350, f: (a, b) => 10 * (256 * a + b) },
+  '5A': { name: 'Pedal acelerador relativo', unit: '%', min: 0, max: 100, f: a => a * 100 / 255 },
+  '5B': { name: 'Bateria do híbrido', unit: '%', min: 0, max: 100, f: a => a * 100 / 255 },
   '5C': { name: 'Temp. óleo', unit: '°C', min: -40, max: 160, f: a => a - 40 },
   '5E': { name: 'Consumo instantâneo', unit: 'L/h', min: 0, max: 30, f: (a, b) => (256 * a + b) / 20 },
+  '61': { name: 'Torque solicitado', unit: '%', min: -125, max: 130, f: a => a - 125 },
+  '62': { name: 'Torque real', unit: '%', min: -125, max: 130, f: a => a - 125 },
+  '63': { name: 'Torque de referência', unit: 'Nm', min: 0, max: 65535, f: (a, b) => 256 * a + b },
   // Odômetro: PID de 2019 (SAE J1979), presente só em carros recentes.
   'A6': { name: 'Odômetro', unit: 'km', min: 0, max: 999999, f: (a, b, c, d) => (a * 2 ** 24 + b * 2 ** 16 + c * 256 + d) / 10 },
 };
@@ -40,18 +63,27 @@ export const hexLines = raw => raw.split(/[\r\n]+/)
   .map(l => l.replace(/\s/g, '').toUpperCase())
   .filter(l => /^[0-9A-F:]+$/.test(l));
 
-export function parsePid(raw, pid) {
-  const line = hexLines(raw).find(l => l.startsWith('41' + pid));
-  if (!line) return null;
-  const [a = 0, b = 0, c = 0, d = 0] = line.slice(4).match(/../g)?.map(h => parseInt(h, 16)) ?? [];
-  return PIDS[pid].f(a, b, c, d);
+// Junta respostas CAN multiquadro ("014", "0:...", "1:...") numa string hex só.
+export const joined = raw => hexLines(raw).filter(l => !/^[0-9A-F]{3}$/.test(l)).map(l => l.replace(/^[0-9A-F]:/, '')).join('');
+
+const resp = mode => (0x40 + parseInt(mode, 16)).toString(16).toUpperCase();
+// Bytes de dados após "<resposta><pid>" (modo 02 tem ainda o byte do nº do frame).
+function dataBytes(raw, mode, pid) {
+  const pre = resp(mode) + pid;
+  const line = hexLines(raw).find(l => l.startsWith(pre));
+  return line && (line.slice(pre.length + (mode === '02' ? 2 : 0)).match(/../g) ?? []).map(h => parseInt(h, 16));
 }
 
-// Resposta de 0100/0120/0140 -> lista de PIDs suportados ("01".."60").
-export function parseSupported(raw, base) {
-  const line = hexLines(raw).find(l => l.startsWith('41' + base));
-  if (!line) return [];
-  const bits = parseInt(line.slice(4, 12), 16);
+export function parsePid(raw, pid, mode = '01') {
+  const b = dataBytes(raw, mode, pid);
+  return b ? PIDS[pid].f(b[0] ?? 0, b[1] ?? 0, b[2] ?? 0, b[3] ?? 0) : null;
+}
+
+// Máscara de suportados (0100, 0120…, 020000, 06A0) -> lista de IDs.
+export function parseSupported(raw, base, mode = '01') {
+  const b = dataBytes(raw, mode, base);
+  if (!b || b.length < 4) return [];
+  const bits = (b[0] << 24 | b[1] << 16 | b[2] << 8 | b[3]) >>> 0;
   const out = [];
   for (let i = 0; i < 32; i++) if (bits & (1 << (31 - i)))
     out.push((parseInt(base, 16) + i + 1).toString(16).toUpperCase().padStart(2, '0'));
@@ -69,7 +101,7 @@ export function parseDtcs(raw, mode, isCan) {
   const lines = hexLines(raw);
   let data;
   if (isCan) {
-    data = lines.filter(l => !/^[0-9A-F]{3}$/.test(l)).map(l => l.replace(/^[0-9A-F]:/, '')).join('');
+    data = joined(raw);
     const i = data.indexOf(resp);
     if (i < 0) return [];
     data = data.slice(i + 4);
@@ -82,11 +114,31 @@ export function parseDtcs(raw, mode, isCan) {
 // Modo 09 PID 02. Remove cabeçalhos "4902xx" (CAN: contagem; K-line: nº da linha) e quadros "N:".
 // 0x49 ('I') nunca aparece num VIN, então o padrão não colide com os dados.
 export function parseVin(raw) {
-  const hex = hexLines(raw).filter(l => !/^[0-9A-F]{3}$/.test(l))
-    .map(l => l.replace(/^[0-9A-F]:/, '')).join('').replace(/4902[0-9A-F]{2}/g, '');
+  const hex = joined(raw).replace(/4902[0-9A-F]{2}/g, '');
   const txt = (hex.match(/../g) ?? []).map(h => String.fromCharCode(parseInt(h, 16))).join('');
   const vin = txt.replace(/[^A-HJ-NPR-Z0-9]/g, '').slice(-17);
   return vin.length === 17 ? vin : null;
+}
+
+// Modo 01 PID 01: luz de injeção, nº de códigos e monitores de prontidão.
+const MON_COMMON = ['Falha de ignição', 'Sistema de combustível', 'Componentes'];
+const MON_SPARK = ['Catalisador', 'Catalisador aquecido', 'Sistema EVAP (cânister)', 'Ar secundário', 'Gás do A/C', 'Sonda lambda', 'Aquecedor da sonda lambda', 'EGR / VVT'];
+const MON_DIESEL = ['Catalisador NMHC', 'NOx / SCR', null, 'Pressão do turbo', null, 'Sensor de gases de escape', 'Filtro de partículas (DPF)', 'EGR / VVT'];
+export function parseMonitors(raw) {
+  const b = dataBytes(raw, '01', '01');
+  if (!b || b.length < 4) return null;
+  const [A, B, C, D] = b, diesel = !!(B & 8);
+  const monitors = [];
+  MON_COMMON.forEach((name, i) => { if (B & 1 << i) monitors.push({ name, complete: !(B & 1 << (i + 4)) }); });
+  (diesel ? MON_DIESEL : MON_SPARK).forEach((name, i) => { if (name && C & 1 << i) monitors.push({ name, complete: !(D & 1 << i) }); });
+  return { mil: !!(A & 0x80), count: A & 0x7f, diesel, monitors };
+}
+
+// Modo 06 (só CAN): registros de 9 bytes MID TID UASID VALOR(2) MIN(2) MAX(2).
+export function parseMode6(raw) {
+  const d = joined(raw), i = d.indexOf('46');
+  if (i < 0) return [];
+  return (d.slice(i + 2).match(/.{18}/g) ?? []).map(r => ({ mid: r.slice(0, 2), tid: r.slice(2, 4), val: parseInt(r.slice(6, 10), 16) }));
 }
 
 // WMI (3 primeiros caracteres do chassi). Prefixos mais longos têm prioridade.
@@ -148,11 +200,8 @@ export class Elm {
     if (!hexLines(r0).some(l => l.startsWith('4100'))) throw new Error('ECU não respondeu: ' + r0.trim());
     const dpn = (await this.send('ATDPN')).trim().replace(/^A/, '');
     this.isCan = /^[6-9AB]/.test(dpn);
-    const supported = parseSupported(r0, '00');
-    for (const base of ['20', '40', '60', '80', 'A0']) {
-      if (!supported.includes(base)) break;
-      supported.push(...parseSupported(await this.send('01' + base), base));
-    }
+    this.defHdr = /^[79]/.test(dpn) ? '18DB33F1' : this.isCan ? '7DF' : '686AF1';
+    const supported = this.supported = await this.scan('01', ['00', '20', '40', '60', '80', 'A0']);
     return {
       version: (await this.send('ATI')).trim(),
       voltage: (await this.send('ATRV')).trim(),
@@ -161,10 +210,64 @@ export class Elm {
     };
   }
 
-  async read(pid) { return parsePid(await this.send('01' + pid), pid); }
-  async vin() { return parseVin(await this.send('0902', 8000)); }
-  async dtcs(mode) { return parseDtcs(await this.send(mode, 8000), mode, this.isCan); }
-  clearDtcs() { return this.send('04', 8000); }
+  // Varre máscaras de suportados encadeadas (00 -> 20 -> 40…) enquanto a anterior anunciar a próxima.
+  async scan(mode, bases, suffix = '') {
+    const out = [];
+    for (const base of bases) {
+      if (base !== bases[0] && !out.includes(base)) break;
+      out.push(...parseSupported(await this.send(mode + base + suffix), base, mode));
+    }
+    return out;
+  }
+
+  // Cabeçalho CAN para falar com outro módulo (PIDs do fabricante); null = padrão OBD.
+  async header(h = null) {
+    if (h === (this.hdr ?? null)) return;
+    this.hdr = h;
+    await this.send('ATSH' + (h ?? this.defHdr));
+    await this.send(h?.length === 3 ? 'ATCRA' + (parseInt(h, 16) + 8).toString(16).toUpperCase() : 'ATAR');
+  }
+  async std(cmd, timeout) { await this.header(); return this.send(cmd, timeout); }
+
+  async read(pid) {
+    const p = PIDS[pid];
+    if (!p.cmd) return parsePid(await this.std('01' + pid), pid);
+    await this.header(p.header || null);
+    const d = joined(await this.send(p.cmd)), i = d.indexOf(p.prefix);
+    if (i < 0) return null;
+    const v = p.calc((d.slice(i + p.prefix.length).match(/../g) ?? []).map(h => parseInt(h, 16)));
+    return Number.isFinite(v) ? v : null;
+  }
+  async vin() { return parseVin(await this.std('0902', 8000)); }
+  async dtcs(mode) { return parseDtcs(await this.std(mode, 8000), mode, this.isCan); }
+  clearDtcs() { return this.std('04', 8000); }
+  async status() { return parseMonitors(await this.std('0101')); }
+
+  // Freeze frame (modo 02, frame 0): código que o gerou + sensores no instante da falha.
+  async freeze() {
+    const line = hexLines(await this.std('020200')).find(l => l.startsWith('4202'));
+    if (!line || /^0*$/.test(line.slice(6, 10))) return null;
+    let pids = (await this.scan('02', ['00', '20', '40'], '00')).filter(p => PIDS[p] && !PIDS[p].text);
+    if (!pids.length) pids = this.supported.filter(p => !PIDS[p].text);
+    const values = [];
+    for (const p of pids) {
+      const v = parsePid(await this.send('02' + p + '00'), p, '02');
+      if (v != null) values.push([p, v]);
+    }
+    return { code: decodeDtc(line.slice(6, 10)), values };
+  }
+
+  // Falhas de ignição por cilindro (modo 06, MIDs A2..AD). TID 0B = média dos últimos ciclos, 0C = ciclo atual.
+  async misfires() {
+    if (!this.isCan) return null;
+    await this.header();
+    const out = [];
+    for (const mid of (await this.scan('06', ['A0'])).filter(m => m >= 'A2' && m <= 'AD')) {
+      const recs = parseMode6(await this.send('06' + mid));
+      out.push({ cyl: parseInt(mid, 16) - 0xA1, cur: recs.find(r => r.tid === '0C')?.val, avg: recs.find(r => r.tid === '0B')?.val });
+    }
+    return out;
+  }
 }
 
 // ---- Transportes: cada um expõe write(str), onData(str), close() ----
@@ -244,6 +347,18 @@ export class DemoTransport {
     if (cmd === '04') return '44';
     if (cmd === '0902') return '014\r0:4902013942574147\r1:34355533' + '4C5030\r2:3132333435';
     if (cmd === '01A6') return '41A60007FC97'; // 52.341,5 km
+    if (cmd === '0101') return '41018307650' + '4'; // MIL acesa, 3 códigos, EVAP incompleto
+    if (cmd === '020200') return '4202000171';
+    if (cmd === '06A0') return '46A0F8000000'; // cilindros 1–4
+    if (/^06A[2-5]$/.test(cmd)) {
+      const mid = cmd.slice(2), n = { A4: [12, 27] }[mid] ?? [0, 1];
+      return '46' + n.map((v, i) => mid + (i ? '0C' : '0B') + '24' + v.toString(16).padStart(4, '0').toUpperCase() + '0000FFFF').join('');
+    }
+    if (cmd.startsWith('22')) return '62' + cmd.slice(2) + Math.round(80 + 20 * Math.sin(Date.now() / 3000)).toString(16).toUpperCase().padStart(2, '0') + '10';
+    if (cmd.startsWith('02') && cmd.length === 6) { // freeze frame = leitura atual com prefixo 42 + frame
+      const r = this.reply('01' + cmd.slice(2, 4));
+      return r.startsWith('41') ? '42' + cmd.slice(2, 4) + '00' + r.slice(4) : 'NO DATA';
+    }
     const pid = cmd.slice(2);
     if (['00', '20', '40', '60', '80', 'A0'].includes(pid)) {
       let bits = 0;

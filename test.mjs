@@ -1,6 +1,6 @@
 // node test.mjs
 import assert from 'node:assert/strict';
-import { parsePid, parseSupported, parseDtcs, parseVin, decodeVin, Elm, DemoTransport } from './obd.js';
+import { parsePid, parseSupported, parseDtcs, parseVin, decodeVin, parseMonitors, parseMode6, Elm, DemoTransport } from './obd.js';
 import { describe } from './dtc.js';
 
 assert.equal(parsePid('41 0C 1A F8\r\r', '0C'), 1726);
@@ -39,4 +39,17 @@ assert.ok(elm.isCan && info.supported.includes('52'));
 assert.ok((await elm.read('0C')) >= 850);
 assert.deepEqual(await elm.dtcs('03'), ['P0171', 'P0301', 'P0420', 'P1136']);
 assert.equal(await elm.vin(), '9BWAG45U3LP012345');
+
+// Prontidão: MIL acesa, 3 códigos, gasolina; catalisador ok, EVAP incompleto
+const st = parseMonitors('41 01 83 07 65 04');
+assert.equal(st.mil, true); assert.equal(st.count, 3); assert.equal(st.diesel, false);
+assert.deepEqual(st.monitors.filter(m => !m.complete).map(m => m.name), ['Sistema EVAP (cânister)']);
+assert.equal(st.monitors.length, 7);
+assert.equal(parseSupported('42 00 00 BE 1F A8 13', '00', '02')[0], '01');
+assert.equal(parsePid('42 0C 00 1A F8', '0C', '02'), 1726);
+assert.deepEqual(parseMode6('013\r0:46A40B24000C00\r1:00FFFFA40C24001B\r2:0000FFFF000000').map(r => [r.tid, r.val]), [['0B', 12], ['0C', 27]]);
+
+const ff = await elm.freeze();
+assert.equal(ff.code, 'P0171'); assert.ok(ff.values.length > 10);
+assert.deepEqual((await elm.misfires()).map(m => [m.cyl, m.cur]), [[1, 1], [2, 1], [3, 27], [4, 1]]);
 console.log('ok');
