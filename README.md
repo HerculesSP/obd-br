@@ -56,9 +56,9 @@ No Android só funciona BLE. Adaptadores de Bluetooth clássico não aparecem no
 
 Em **Veículo → Sensores do fabricante**, escolha **marca, modelo e ano**. O ano é preenchido pelo chassi. O app baixa a lista de sensores daquele carro e, com o carro conectado, **testa quais ele responde** e mantém só esses. Na prática, isso também filtra pelo motor, porque sinais de outro motor não respondem.
 
-Fontes do catálogo (`catalog.json`, ~430 modelos):
+Fontes do catálogo (`catalog.json`, ~450 modelos):
 
-- **[OBDb](https://github.com/OBDb)**: base comunitária aberta (CC BY-SA 4.0), baixada direto do GitHub na hora. Tem bons dados para VW (Polo, Virtus, T-Cross, Taos, Jetta, Up), Toyota (Corolla, Corolla Cross, Hilux, Yaris), Honda (Civic, Fit, HR-V, City), Hyundai/Kia, Ford (EcoSport, Ranger, Maverick), Chevrolet (S10, Tracker, Cruze), Jeep (Renegade, Compass), Nissan (Kicks, Versa), Peugeot 208/3008 e outros. Ainda não tem Onix, HB20, Strada, Argo, Mobi nem Kwid.
+- **[OBDb](https://github.com/OBDb)**: base comunitária aberta (CC BY-SA 4.0), baixada direto do GitHub na hora. Tem bons dados para VW (Polo, Virtus, T-Cross, Taos, Jetta, Up), Toyota (Corolla, Corolla Cross, Hilux, Yaris), Honda (Civic, Fit, HR-V, City), Hyundai/Kia, Ford (EcoSport, Ranger, Maverick), Chevrolet (S10, Tracker, Cruze), Jeep (Renegade, Compass), Nissan (Kicks, Versa), Peugeot 208/3008 e outros. Também tem HB20S e Spin. Ainda sem dados: Onix, HB20, Strada, Argo, Mobi, Kwid e Duster.
   - Sinais marcados com **?** não foram confirmados pela comunidade para aquele ano-modelo. Confira se os valores fazem sentido.
 - **Listas Torque públicas** do GitHub: Prius NHW20, motores Renault K9K, Golf 7 GTD, VW MQB TSI.
 - **Comunidade (`pids/`)**: listas enviadas por pull request (veja `pids/README.md`).
