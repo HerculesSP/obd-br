@@ -58,6 +58,44 @@ export const PIDS = {
   'A6': { name: 'Odômetro', unit: 'km', min: 0, max: 999999, f: (a, b, c, d) => (a * 2 ** 24 + b * 2 ** 16 + c * 256 + d) / 10 },
 };
 
+// Demais PIDs padrão SAE J1979 (sondas extras, banco 2, catalisadores, EVAP…).
+const pct = a => a * 100 / 255, trim = a => a / 1.28 - 100, lam = (a, b) => 2 * (256 * a + b) / 65536;
+const FUEL_SYS = { 1: 'Malha aberta (motor frio)', 2: 'Malha fechada', 4: 'Malha aberta (carga/corte)', 8: 'Malha aberta (falha)', 16: 'Malha fechada (sonda c/ falha)' };
+const OBD_STD = { 1: 'OBD-II (CARB)', 2: 'OBD (EPA)', 3: 'OBD e OBD-II', 4: 'OBD-I', 5: 'Não compatível', 6: 'EOBD (Europa)', 7: 'EOBD e OBD-II', 8: 'EOBD e OBD', 9: 'EOBD, OBD e OBD-II', 10: 'JOBD (Japão)', 11: 'JOBD e OBD-II', 12: 'JOBD e EOBD', 13: 'JOBD, EOBD e OBD-II' };
+Object.assign(PIDS, {
+  '03': { name: 'Estado do sistema de combustível', unit: '', text: true, f: a => FUEL_SYS[a] ?? '—' },
+  '08': { name: 'Ajuste curto (STFT) B2', unit: '%', min: -25, max: 25, f: trim },
+  '09': { name: 'Ajuste longo (LTFT) B2', unit: '%', min: -25, max: 25, f: trim },
+  '1C': { name: 'Padrão OBD', unit: '', text: true, f: a => OBD_STD[a] ?? `Padrão nº ${a}` },
+  '2D': { name: 'Erro da EGR', unit: '%', min: -100, max: 100, f: a => a / 1.28 - 100 },
+  '32': { name: 'Pressão vapor EVAP', unit: 'Pa', min: -8192, max: 8192, f: (a, b) => ((a << 8 | b) << 16 >> 16) / 4 },
+  '3D': { name: 'Temp. catalisador B2S1', unit: '°C', min: -40, max: 1000, f: (a, b) => (256 * a + b) / 10 - 40 },
+  '3E': { name: 'Temp. catalisador B1S2', unit: '°C', min: -40, max: 1000, f: (a, b) => (256 * a + b) / 10 - 40 },
+  '3F': { name: 'Temp. catalisador B2S2', unit: '°C', min: -40, max: 1000, f: (a, b) => (256 * a + b) / 10 - 40 },
+  '48': { name: 'Posição borboleta C', unit: '%', min: 0, max: 100, f: pct },
+  '4B': { name: 'Pedal acelerador F', unit: '%', min: 0, max: 100, f: pct },
+  '53': { name: 'Pressão absoluta EVAP', unit: 'kPa', min: 0, max: 328, f: (a, b) => (256 * a + b) / 200 },
+  '54': { name: 'Pressão vapor EVAP (ampla)', unit: 'Pa', min: -32768, max: 32767, f: (a, b) => 256 * a + b - 32768 },
+  '55': { name: 'Ajuste curto sonda secundária B1', unit: '%', min: -25, max: 25, f: trim },
+  '56': { name: 'Ajuste longo sonda secundária B1', unit: '%', min: -25, max: 25, f: trim },
+  '57': { name: 'Ajuste curto sonda secundária B2', unit: '%', min: -25, max: 25, f: trim },
+  '58': { name: 'Ajuste longo sonda secundária B2', unit: '%', min: -25, max: 25, f: trim },
+  '5D': { name: 'Ponto de injeção', unit: '°', min: -210, max: 302, f: (a, b) => (256 * a + b) / 128 - 210 },
+  '66': { name: 'Fluxo de ar (MAF) sensor A', unit: 'g/s', min: 0, max: 2048, f: (a, b, c) => (256 * b + c) / 32 },
+  '67': { name: 'Temp. arrefecimento sensor 1', unit: '°C', min: -40, max: 215, f: (a, b) => b - 40 },
+  '68': { name: 'Temp. ar admissão sensor 1', unit: '°C', min: -40, max: 215, f: (a, b) => b - 40 },
+  '84': { name: 'Temp. superfície do coletor', unit: '°C', min: -40, max: 215, f: a => a - 40 },
+  '8E': { name: 'Torque de atrito do motor', unit: '%', min: -125, max: 130, f: a => a - 125 },
+  'A2': { name: 'Combustível por ciclo', unit: 'mg', min: 0, max: 2048, f: (a, b) => (256 * a + b) / 32 },
+});
+// Sondas lambda convencionais (14–1B) e de banda larga (24–2B tensão; 34–3B corrente).
+for (let i = 0; i < 8; i++) {
+  const pos = `B${(i >> 2) + 1}S${(i & 3) + 1}`, h = n => n.toString(16).toUpperCase();
+  PIDS[h(0x14 + i)] ??= { name: `Sonda lambda ${pos}`, unit: 'V', min: 0, max: 1.275, f: a => a / 200 };
+  PIDS[h(0x24 + i)] ??= { name: `Lambda ${pos} (banda larga)`, unit: 'λ', min: 0, max: 2, f: lam };
+  PIDS[h(0x34 + i)] ??= { name: `Lambda ${pos} (banda larga, corrente)`, unit: 'λ', min: 0, max: 2, f: lam };
+}
+
 // Linhas hex limpas: descarta "SEARCHING...", "BUS INIT", "NO DATA", eco etc.
 export const hexLines = raw => raw.split(/[\r\n]+/)
   .map(l => l.replace(/\s/g, '').toUpperCase())
@@ -80,10 +118,11 @@ export function parsePid(raw, pid, mode = '01') {
 }
 
 // Máscara de suportados (0100, 0120…, 020000, 06A0) -> lista de IDs.
+// Vários módulos (motor, câmbio…) podem responder: junta (OU) as máscaras de todos.
 export function parseSupported(raw, base, mode = '01') {
-  const b = dataBytes(raw, mode, base);
-  if (!b || b.length < 4) return [];
-  const bits = (b[0] << 24 | b[1] << 16 | b[2] << 8 | b[3]) >>> 0;
+  const pre = resp(mode) + base, skip = pre.length + (mode === '02' ? 2 : 0);
+  const bits = hexLines(raw).filter(l => l.startsWith(pre) && l.length >= skip + 8)
+    .reduce((acc, l) => (acc | parseInt(l.slice(skip, skip + 8), 16)) >>> 0, 0);
   const out = [];
   for (let i = 0; i < 32; i++) if (bits & (1 << (31 - i)))
     out.push((parseInt(base, 16) + i + 1).toString(16).toUpperCase().padStart(2, '0'));
@@ -378,7 +417,7 @@ export class DemoTransport {
       '0D': [Math.round(90 * w(9))],
       '05': [Math.round(40 + Math.min(92, 25 + s * 2))],
       '42': [13900 >> 8, 13900 & 255],
-      '51': [3],
+      '51': [3], '03': [2], '1C': [1],
       '52': [Math.round(255 * 0.62)],
       '5E': [0, Math.round(20 * (1 + 10 * w(5)))],
       '10': [0, Math.round(rpm / 15)],

@@ -11,6 +11,7 @@ assert.equal(parsePid('4151 03', '51'), 'Etanol');
 
 assert.deepEqual(parseSupported('41 00 BE 1F A8 13', '00').slice(0, 4), ['01', '03', '04', '05']);
 assert.ok(parseSupported('4100BE1FA813', '00').includes('20'));
+assert.deepEqual(parseSupported('4100 00000001\r4100 80000000', '00'), ['01', '20']); // motor + câmbio
 
 assert.deepEqual(parseDtcs('43 01 33 00 00 00 00', '03', false), ['P0133']);
 assert.deepEqual(parseDtcs('43 01 71 03 01 04 20\r43 C1 01 00 00 00 00', '03', false), ['P0171', 'P0301', 'P0420', 'U0101']);
