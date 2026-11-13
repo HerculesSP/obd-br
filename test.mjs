@@ -73,6 +73,36 @@ const { PIDS } = await import('./obd.js');
 PIDS.X0 = csv.pids[0];
 const atf = await elm.read('X0');
 assert.ok(atf >= 20 && atf <= 70, atf);
-assert.equal(elm.hdr, '7E1');
+assert.equal(elm.hdr, '7E1/');
 assert.ok((await elm.read('0C')) > 0); assert.equal(elm.hdr, null);
 console.log('ok csv');
+
+// OBDb: bits MSB-first, blsb, sinal, limites nulos, mapas, filtros de ano
+const { decodeObdb, yearMatches, parseObdb } = await import('./custom.js');
+assert.equal(decodeObdb({ len: 16, div: 10, max: 1000, unit: 'kilometers' }, [0x01, 0x2C]), 30);
+assert.equal(decodeObdb({ bix: 4, len: 4, max: 15 }, [0xA5]), 5);
+assert.equal(decodeObdb({ len: 16, blsb: true, max: 7000, unit: 'rpm' }, [0xE8, 0x03]), 1000);
+assert.equal(decodeObdb({ len: 8, sign: true, min: -128, max: 127 }, [0xFE]), -2);
+assert.equal(decodeObdb({ len: 8, max: 400, nullmax: 255 }, [0xFF]), null);
+assert.equal(decodeObdb({ len: 8, map: { 3: { description: 'Third gear', value: '3' } } }, [3]), 'Third gear');
+assert.equal(decodeObdb({ bix: 2, len: 1, max: 1, unit: 'offon' }, [0x20]), 'Ligado');
+assert.equal(decodeObdb({ len: 32, max: 1 }, [1]), null); // resposta curta
+assert.ok(yearMatches({ from: 2019, to: 2017 }, 2020) && !yearMatches({ from: 2019, to: 2017 }, 2018));
+assert.ok(yearMatches({ years: [2018] }, 2018) && !yearMatches({ from: 2021 }, 2020));
+const ob = parseObdb({ commands: [
+  { hdr: '7E0', rax: '7E8', cmd: { 22: '10A4' }, dbgfilter: { to: 2017 }, signals: [{ id: 'POLO_X', name: 'Rot', fmt: { len: 16, max: 8000, unit: 'rpm' } }] },
+  { hdr: '7E0', cmd: { 22: '2000' }, filter: { from: 2021 }, signals: [{ id: 'A', name: 'Novo', fmt: { len: 8, max: 1 } }] },
+  { hdr: '7E0', dbg: true, cmd: { 22: '3000' }, signals: [{ id: 'B', name: 'Dbg', fmt: { len: 8, max: 1 } }] },
+  { hdr: 'DA10', rax: '10', cmd: { 22: '4000' }, signals: [{ id: 'C_RAW_1', name: 'Raw', fmt: { len: 8 } }, { id: 'C', name: 'Marcha', fmt: { len: 8, map: { 1: { description: '1ª' } } } }] },
+] }, 2016);
+assert.deepEqual(ob.map(p => [p.name, p.cmd, p.prefix, p.unit, p.unverified, p.text]),
+  [['Rot', '2210A4', '6210A4', 'rpm', true, false], ['Marcha', '224000', '624000', '', false, true]]);
+
+// Sequência ELM para módulo 29 bits num carro CAN 11 bits, e volta ao padrão
+const sent = [];
+const t2 = new DemoTransport(); const w = t2.write.bind(t2); t2.write = c => { sent.push(c.trim()); w(c); };
+const e2 = new Elm(t2); await t2.open(); await e2.init();
+PIDS.X9 = ob[1]; sent.length = 0;
+await e2.read('X9'); await e2.read('0C');
+assert.deepEqual(sent, ['ATTP7', 'ATCP18', 'ATSHDA10F1', 'ATCRA18DAF110', '224000', 'ATTP6', 'ATSH7DF', 'ATAR', '010C']);
+console.log('ok obdb');

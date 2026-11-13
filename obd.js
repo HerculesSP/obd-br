@@ -239,7 +239,8 @@ export class Elm {
     if (!hexLines(r0).some(l => l.startsWith('4100'))) throw new Error('ECU não respondeu: ' + r0.trim());
     const dpn = (await this.send('ATDPN')).trim().replace(/^A/, '');
     this.isCan = /^[6-9AB]/.test(dpn);
-    this.defHdr = /^[79]/.test(dpn) ? '18DB33F1' : this.isCan ? '7DF' : '686AF1';
+    this.dpn = dpn;
+    this.defHdr = /^[79]/.test(dpn) ? 'DB33F1' : this.isCan ? '7DF' : '686AF1';
     const supported = this.supported = await this.scan('01', ['00', '20', '40', '60', '80', 'A0']);
     return {
       version: (await this.send('ATI')).trim(),
@@ -259,23 +260,39 @@ export class Elm {
     return out;
   }
 
-  // Cabeçalho CAN para falar com outro módulo (PIDs do fabricante); null = padrão OBD.
-  async header(h = null) {
-    if (h === (this.hdr ?? null)) return;
-    this.hdr = h;
-    await this.send('ATSH' + (h ?? this.defHdr));
-    await this.send(h?.length === 3 ? 'ATCRA' + (parseInt(h, 16) + 8).toString(16).toUpperCase() : 'ATAR');
+  // Endereça outro módulo (PIDs do fabricante); null = padrão OBD.
+  // 3 dígitos = CAN 11 bits (resposta em hdr+8 ou rax). 4 dígitos = CAN 29 bits no formato OBDb:
+  // "DA10" -> envia 18DA10F1, resposta 18DAF1<rax>. Num carro 11 bits troca temporariamente para 29 bits (ATTP).
+  async header(h = null, rax = null) {
+    const key = h && h + '/' + (rax ?? '');
+    if (key === (this.hdr ?? null)) return;
+    const was29 = this.hdr?.split('/')[0].length === 4, is29 = h?.length === 4;
+    const tp = { 6: '7', 8: '9' }[this.dpn];
+    this.hdr = key;
+    if (tp && is29 !== was29) await this.send('ATTP' + (is29 ? tp : this.dpn));
+    if (!h) { await this.send('ATSH' + this.defHdr); await this.send('ATAR'); return; }
+    if (is29) {
+      await this.send('ATCP18');
+      await this.send('ATSH' + h + 'F1');
+      await this.send('ATCRA' + (rax?.length > 2 ? rax.padStart(8, '18') : '18DAF1' + (rax ?? h.slice(2))));
+    } else {
+      await this.send('ATSH' + h);
+      await this.send('ATCRA' + (rax ?? (parseInt(h, 16) + 8).toString(16).toUpperCase()));
+    }
   }
   async std(cmd, timeout) { await this.header(); return this.send(cmd, timeout); }
 
   async read(pid) {
     const p = PIDS[pid];
     if (!p.cmd) return parsePid(await this.std('01' + pid), pid);
-    await this.header(p.header || null);
-    const d = joined(await this.send(p.cmd)), i = d.indexOf(p.prefix);
+    await this.header(p.header || null, p.rax || null);
+    // Vários sinais vêm do mesmo comando: reaproveita a resposta por 500 ms.
+    const key = this.hdr + p.cmd, c = (this.cache ??= {})[key];
+    const raw = c && Date.now() - c.t < 500 ? c.raw : (this.cache[key] = { t: Date.now(), raw: await this.send(p.cmd) }).raw;
+    const d = joined(raw), i = d.indexOf(p.prefix);
     if (i < 0) return null;
     const v = p.calc((d.slice(i + p.prefix.length).match(/../g) ?? []).map(h => parseInt(h, 16)));
-    return Number.isFinite(v) ? v : null;
+    return typeof v === 'string' || Number.isFinite(v) ? v : null;
   }
   async vin() { return parseVin(await this.std('0902', 8000)); }
   async dtcs(mode) { return parseDtcs(await this.std(mode, 8000), mode, this.isCan); }
