@@ -17,7 +17,7 @@ Web Serial e Web Bluetooth exigem Chrome/Edge e `localhost` ou HTTPS. Clique em 
 2. Abra a página no Chrome do Android e escolha **⋮ → Instalar app**.
 3. O app abre em tela cheia, funciona offline e mantém a tela acesa enquanto está conectado.
 
-No celular use adaptador **Bluetooth LE**, ou **USB via cabo OTG** (o Chrome do Android tem Web Serial desde a versão 136; se o seu não tiver, o botão USB fica desativado).
+No celular use adaptador **Bluetooth LE**, ou **USB via cabo OTG** (só se o Chrome do aparelho tiver Web Serial; se não tiver, o botão USB fica desativado).
 
 ## Adaptadores
 
@@ -35,7 +35,7 @@ No Android só funciona BLE. Adaptadores de Bluetooth clássico não aparecem no
 - **K-line (ISO 9141 / KWP2000)**: comum em Fiat, VW e GM até ~2012. A busca automática pode levar até 15 s. Se falhar, escolha o protocolo manualmente.
 - **OBDBr-1 (2007–2009)**: o suporte é parcial; muitos não respondem a scanners genéricos.
 - **Flex**: o painel mostra o tipo de combustível (PID 51) e o **% de etanol no tanque** (PID 52), quando a ECU informa. O P0171 (mistura pobre) tem nota específica para flex.
-- Só os sensores que a ECU declara como suportados (PIDs 00/20/40) aparecem.
+- Só os sensores que a ECU declara como suportados (PIDs 00 a A0) aparecem.
 
 ## Uso
 
