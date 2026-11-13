@@ -1,0 +1,5 @@
+# Exemplo de formato (Torque Pro). Os PIDs abaixo são ilustrativos e funcionam no modo Demonstração.
+# Para o seu carro, use uma lista do seu modelo (procure por "<modelo> torque pids csv").
+Name,ShortName,ModeAndPID,Equation,Min Value,Max Value,Units,Header
+Temp. fluido do câmbio (exemplo),ATF,0x221940,A-40,-40,150,°C,7E1
+Pressão do turbo (exemplo),Boost,0x22F40B,(A*256+B)/100,0,300,kPa,7E0

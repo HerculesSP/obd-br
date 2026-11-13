@@ -53,3 +53,25 @@ const ff = await elm.freeze();
 assert.equal(ff.code, 'P0171'); assert.ok(ff.values.length > 10);
 assert.deepEqual((await elm.misfires()).map(m => [m.cyl, m.cur]), [[1, 1], [2, 1], [3, 27], [4, 1]]);
 console.log('ok');
+
+// Importação CSV (formato Torque)
+const { parseTorqueCsv, compile } = await import('./custom.js');
+assert.equal(compile('A-40')([130]), 90);
+assert.equal(compile('(A*256+B)/10')([1, 44]), 30);
+assert.equal(compile('Signed(A)*2')([0xF0]), -32);
+assert.equal(compile('{B:7}')([0, 0x80]), 1);
+assert.equal(compile('INT(AA/3)')(Array(27).fill(10)), 3);
+assert.throws(() => compile('A; alert(1)'));
+assert.throws(() => compile('constructor'));
+const csv = parseTorqueCsv('Name,ShortName,ModeAndPID,Equation,Min Value,Max Value,Units,Header\n"Temp. câmbio, ATF",ATF,0x221940,A-40,-40,150,°C,7E1\nRuim,R,zz,A,0,1,,\nSem header,S,2101FF,A*2,,,%,');
+assert.equal(csv.pids.length, 2); assert.equal(csv.errors.length, 1);
+assert.deepEqual([csv.pids[0].name, csv.pids[0].cmd, csv.pids[0].prefix, csv.pids[0].header], ['Temp. câmbio, ATF', '221940', '621940', '7E1']);
+assert.equal(csv.pids[1].max, 100);
+// leitura via simulador com troca de cabeçalho
+const { PIDS } = await import('./obd.js');
+PIDS.X0 = csv.pids[0];
+const atf = await elm.read('X0');
+assert.ok(atf >= 20 && atf <= 70, atf);
+assert.equal(elm.hdr, '7E1');
+assert.ok((await elm.read('0C')) > 0); assert.equal(elm.hdr, null);
+console.log('ok csv');
