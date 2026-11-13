@@ -47,9 +47,9 @@
   .tile b { font: 600 24px/1.2 ui-monospace, "SF Mono", Consolas, monospace; font-variant-numeric: tabular-nums; }
   .tile span { color: var(--muted); font-size: 12px; margin-left: 4px; }
   .hint { color: var(--muted); font-size: 13px; }
-  .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; }
+  .charts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .chart select { width: 100%; margin-bottom: 6px; }
   .chart { background: var(--panel); border-radius: 12px; padding: 10px 12px; }
-  .chart h3 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
   .chart canvas { width: 100%; height: 180px; display: block; cursor: crosshair; }
   .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
   table { width: 100%; border-collapse: collapse; }
@@ -102,7 +102,6 @@
 <main>
   <section id="painel">
     <div class="gauges"><canvas id="g0C"></canvas><canvas id="g0D"></canvas><canvas id="g05"></canvas></div>
-    <p class="hint">Toque num mostrador para incluir ou remover dos gráficos.</p>
     <div class="tiles" id="tiles"></div>
   </section>
   <section id="graficos" hidden>
@@ -130,7 +129,15 @@
       <dt>Rodado desde que os códigos foram apagados</dt><dd id="vClr">—</dd>
       <dt>Rodado com a luz de injeção acesa</dt><dd id="vMil">—</dd>
       <dt>Viagem atual (calculada pela velocidade)</dt><dd id="vTrip">—</dd>
+      <dt>Consumo médio da viagem (calc.)</dt><dd id="vAvg">—</dd>
     </dl>
+    <p><label class="hint">Combustível no tanque, para os cálculos de consumo:
+      <select id="fuel">
+        <option value="auto">Automático (sensor de etanol; sem ele, gasolina comum)</option>
+        <option value="0.3">Gasolina comum (E30)</option>
+        <option value="1">Etanol</option>
+        <option value="0.65">Mistura gasolina + etanol (meio a meio)</option>
+      </select></label></p>
     <p class="hint">O odômetro só aparece em carros cuja central informa o PID A6 (geralmente modelos recentes). A quilometragem do painel fica no módulo do painel de instrumentos, que não é acessível pelo OBD genérico.</p>
     <h3>Sensores do fabricante</h3>
     <p class="hint">Importe uma lista de PIDs no formato CSV do Torque Pro (colunas Name, ShortName, ModeAndPID, Equation, Min, Max, Units, Header), como as que circulam por modelo de carro. Os sensores aparecem no Painel e podem ir para os gráficos. <a href="exemplo-pids.csv" download>Baixar exemplo</a></p>

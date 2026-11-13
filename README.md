@@ -39,9 +39,10 @@ No Android só funciona BLE. Adaptadores de Bluetooth clássico não aparecem no
 
 ## Uso
 
-- **Painel**: toque num mostrador para incluí-lo ou removê-lo dos gráficos. Mostradores e sensores em gráfico são lidos a cada ciclo; os demais, em rodízio.
-- **Gráficos**: janela de 30 s, 1 min ou 5 min, com cursor para inspecionar valores. Use **Exportar CSV** para baixar o log da sessão (abre no Excel em português).
-- **Painel**: cerca de 50 sensores do padrão OBD-II (motor, combustível, sondas, torque, pedal, catalisador, etanol…). Só aparecem os que o carro suporta.
+- **Painel**: mostradores e sensores dos gráficos são lidos a cada ciclo; os demais, em rodízio.
+- **Gráficos**: 4 gráficos, cada um com o sensor que você escolher (a escolha fica salva). Janela de 30 s, 1 min ou 5 min, com cursor para inspecionar valores. Use **Exportar CSV** para baixar o log da sessão (abre no Excel em português).
+- **Sensores**: a tabela SAE J1979 completa (~90 PIDs: motor, combustível, todas as sondas lambda, bancos 1 e 2, catalisadores, EVAP, torque, pedal, etanol…). Também junta os sensores anunciados por todos os módulos que respondem (motor, câmbio…). Só aparecem os que o carro suporta.
+- **Calculados**: consumo instantâneo (km/L), fluxo de combustível (L/h, quando a central não informa), potência (cv) e consumo médio da viagem. O cálculo usa o sensor de etanol se existir; se não, o combustível escolhido na aba Veículo (gasolina comum E30, etanol ou mistura).
 - **Códigos de erro**: lê os códigos armazenados (modo 03), pendentes (07) e permanentes (0A). **Apagar** (modo 04) desliga a luz de injeção e zera os monitores de prontidão. Na mesma leitura:
   - **Estado e prontidão** (modo 01 PID 01): mostra se a luz de injeção está acesa, quantos códigos há e cada monitor (catalisador, EVAP, sonda…) completo ou incompleto. Avisa quando há **indício de códigos apagados recentemente** (monitores incompletos, poucos km ou poucas partidas desde a limpeza). Útil na compra de usado.
   - **Dados congelados** (modo 02): os sensores no instante em que a falha aconteceu.

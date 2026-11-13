@@ -9,14 +9,38 @@ const MAX_LOG = 200000; // ponytail: log em memória; gravar em IndexedDB se ses
 
 let elm = null, running = false, supported = [];
 const hist = {}, last = {}, log = [], hover = {};
-const charted = new Set(Object.keys(GAUGES));
-let trip = 0, lastSpeed = null;
+let trip = 0, fuelUsed = 0, lastSpeed = null;
+
+// Preferências por aparelho (sobrevivem a recarregar; falham em silêncio se o navegador bloquear).
+const pref = (k, d) => { try { return JSON.parse(localStorage.getItem('obd-br.' + k)) ?? d; } catch { return d; } };
+const save = (k, v) => { try { localStorage.setItem('obd-br.' + k, JSON.stringify(v)); } catch { /* sem armazenamento */ } };
+
+// 4 gráficos, cada um com o sensor escolhido pelo usuário.
+const slots = pref('slots', ['0C', '0D', '05', '04']);
+const charted = () => new Set(slots);
+
+// ---- Sensores calculados (como no MotorData/Torque) ----
+// Fração de etanol: PID 52 se a central informar; senão o combustível escolhido na aba Veículo.
+$('#fuel').value = pref('fuel', 'auto');
+$('#fuel').onchange = () => save('fuel', $('#fuel').value);
+const ethanol = () => $('#fuel').value === 'auto' ? (last['52'] ?? 30) / 100 : +$('#fuel').value;
+// Estequiometria e densidade interpoladas entre gasolina pura (14,7:1; 745 g/L) e etanol (9,0:1; 789 g/L).
+// ponytail: interpolação linear; o etanol hidratado real é ~5% mais rico, refinar com tabela se a precisão importar.
+const fuelRate = () => last['5E'] ?? (last['10'] == null ? null : last['10'] * 3600 / (14.7 - 5.7 * ethanol()) / (745 + 44 * ethanol()));
+Object.assign(PIDS, {
+  C0: { name: 'Fluxo de combustível (calc.)', unit: 'L/h', min: 0, max: 30, need: s => s.includes("10") && !s.includes("5E"), derive: fuelRate },
+  C1: { name: 'Consumo instantâneo (calc.)', unit: 'km/L', min: 0, max: 40, need: s => s.includes('0D') && (s.includes('10') || s.includes('5E')),
+    derive: () => { const r = fuelRate(); return r > 0.1 && last['0D'] > 3 ? last['0D'] / r : null; } },
+  C2: { name: 'Potência (calc.)', unit: 'cv', min: 0, max: 300, need: s => ['0C', '62', '63'].every(p => s.includes(p)),
+    derive: () => last['62'] == null || last['63'] == null ? null : Math.max(0, last['62']) / 100 * last['63'] * last['0C'] / 7023.5 },
+});
+const CALC_DEPS = ['10', '5E', '62', '63']; // lidos a cada ciclo para os calculados ficarem precisos
 
 navigator.serviceWorker?.register('sw.js').catch(() => {});
 for (const [k, v] of Object.entries(MAKE_NAMES)) $('#make').add(new Option(v, k));
 
 const status = s => { $('#status').textContent = s; };
-const DP = { V: 2, 'g/s': 1, 'L/h': 1, 'λ': 3 };
+const DP = { V: 2, 'g/s': 1, 'L/h': 1, 'km/L': 1, 'λ': 3 };
 const esc = s => String(s).replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
 const fmt = (pid, v) => typeof v === 'string' ? v : v.toFixed(DP[PIDS[pid].unit] ?? 0);
 
@@ -35,7 +59,7 @@ async function connect(t) {
     elm = new Elm(t);
     status('Inicializando ELM327 e procurando protocolo (K-line pode levar até 15 s)…');
     const info = await elm.init($('#proto').value);
-    supported = [...info.supported, ...Object.keys(PIDS).filter(k => k.startsWith('X'))];
+    supported = [...info.supported, ...Object.keys(PIDS).filter(k => PIDS[k].need?.(info.supported)), ...Object.keys(PIDS).filter(k => k.startsWith('X'))];
     status(`${info.version} · ${info.protocol} · bateria ${info.voltage} · ${supported.length} sensores`);
     buildTiles();
     await readVehicle();
@@ -68,14 +92,17 @@ function setConnected(on) {
 async function loop() {
   let i = 0;
   while (running) {
-    const fast = supported.filter(p => charted.has(p) || p in GAUGES);
-    const slow = supported.filter(p => !fast.includes(p));
+    const sensors = supported.filter(p => !PIDS[p].derive), on = charted();
+    const fast = sensors.filter(p => on.has(p) || p in GAUGES || CALC_DEPS.includes(p));
+    const slow = sensors.filter(p => !fast.includes(p));
     for (const p of slow.length ? [...fast, slow[i++ % slow.length]] : fast) {
       if (!running) return;
       const v = await elm.read(p);
       if (v != null) record(p, v);
     }
-    render();
+    for (const p of supported) if (PIDS[p].derive) { const v = PIDS[p].derive(); if (v != null) record(p, v); }
+    renderCharts();
+render();
     await new Promise(r => setTimeout(r, 50));
   }
 }
@@ -95,7 +122,11 @@ const km = v => v == null ? '—' : v.toLocaleString('pt-BR', { maximumFractionD
 
 function record(pid, v) {
   if (pid === '0D') { // integra velocidade (km/h) no tempo -> km
-    if (lastSpeed) trip += (lastSpeed[1] + v) / 2 * (Date.now() - lastSpeed[0]) / 3.6e6;
+    if (lastSpeed) {
+      const dt = Date.now() - lastSpeed[0];
+      trip += (lastSpeed[1] + v) / 2 * dt / 3.6e6;
+      fuelUsed += (fuelRate() ?? 0) * dt / 3.6e6;
+    }
     lastSpeed = [Date.now(), v];
   }
   last[pid] = v;
@@ -108,16 +139,10 @@ function record(pid, v) {
 // ---- Painel ----
 function buildTiles() {
   $('#tiles').replaceChildren(...supported.map(pid => {
-    const b = document.createElement('button');
-    b.className = 'tile' + (charted.has(pid) ? ' on' : '');
+    const b = document.createElement('div');
+    b.className = 'tile' + (PIDS[pid].derive ? ' on' : '');
     b.id = 't' + pid;
     b.innerHTML = `<small>${esc(PIDS[pid].name)}</small><b>—</b><span>${esc(PIDS[pid].unit)}</span>`;
-    b.onclick = () => {
-      if (PIDS[pid].text) return;
-      charted.has(pid) ? charted.delete(pid) : charted.add(pid);
-      b.classList.toggle('on');
-      renderCharts();
-    };
     return b;
   }));
   renderCharts();
@@ -126,7 +151,8 @@ function buildTiles() {
 function render() {
   for (const [pid, red] of Object.entries(GAUGES)) gauge($('#g' + pid), pid, last[pid], red);
   for (const pid of supported) if (pid in last) $('#t' + pid + ' b').textContent = fmt(pid, last[pid]);
-  if (!$('#graficos').hidden) for (const pid of charted) chart(pid);
+  if (!$('#graficos').hidden) slots.forEach((_, i) => chart(i));
+  $('#vAvg').textContent = fuelUsed > 0.01 && trip > 0.1 ? (trip / fuelUsed).toFixed(1) + ' km/L' : '—';
   $('#vOdo').textContent = km(last.A6);
   $('#vClr').textContent = km(last['31']);
   $('#vMil').textContent = km(last['21']);
@@ -169,25 +195,33 @@ function gauge(cv, pid, v, red) {
 }
 
 // ---- Gráficos ----
+// Monta os 4 gráficos; o seletor de cada um lista os sensores numéricos suportados.
 function renderCharts() {
-  const list = supported.filter(p => charted.has(p));
-  $('#charts').replaceChildren(...list.map(pid => {
+  const opts = supported.filter(p => !PIDS[p].text);
+  $('#charts').replaceChildren(...slots.map((pid, i) => {
     const d = document.createElement('div');
     d.className = 'chart';
-    d.innerHTML = `<h3>${esc(PIDS[pid].name)} <span class="hint">(${esc(PIDS[pid].unit)})</span></h3><canvas id="c${pid}" role="img" aria-label="Gráfico de ${esc(PIDS[pid].name)}"></canvas>`;
+    d.innerHTML = `<select aria-label="Sensor do gráfico ${i + 1}"><option value="">— escolha um sensor —</option>${opts.map(p =>
+      `<option value="${p}"${p === pid ? ' selected' : ''}>${esc(PIDS[p].name)} (${esc(PIDS[p].unit)})</option>`).join('')}</select>
+      <canvas id="k${i}" role="img" aria-label="Gráfico ${i + 1}"></canvas>`;
+    d.querySelector('select').onchange = e => { slots[i] = e.target.value; save('slots', slots); chart(i); };
     const cv = d.querySelector('canvas');
-    cv.onpointermove = e => { hover[pid] = e.offsetX; chart(pid); };
-    cv.onpointerleave = () => { delete hover[pid]; chart(pid); };
+    cv.onpointermove = e => { hover[i] = e.offsetX; chart(i); };
+    cv.onpointerleave = () => { delete hover[i]; chart(i); };
     return d;
   }));
-  if (!list.length) $('#charts').innerHTML = '<p class="hint">Nenhum sensor selecionado. Toque nos mostradores do Painel para adicionar.</p>';
-  if (!$('#graficos').hidden) list.forEach(chart);
+  if (!$('#graficos').hidden) slots.forEach((_, i) => chart(i));
 }
 
-function chart(pid) {
-  const cv = $('#c' + pid);
+function chart(i) {
+  const cv = $('#k' + i), pid = slots[i];
   if (!cv) return;
   const { ctx, w, h } = fit(cv);
+  if (!PIDS[pid] || !supported.includes(pid)) {
+    ctx.fillStyle = css('--muted'); ctx.font = '13px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(supported.length ? 'Escolha um sensor acima' : 'Conecte para ver os dados', w / 2, h / 2);
+    return;
+  }
   const now = Date.now(), win = +$('#win').value * 1000;
   const pts = (hist[pid] ?? []).filter(([t]) => t >= now - win);
   const L = 44, R = 8, T = 8, B = 20, pw = w - L - R, ph = h - T - B;
@@ -215,7 +249,7 @@ function chart(pid) {
   ctx.stroke();
 
   // Crosshair + tooltip no ponto mais próximo do cursor (ou o último, sem hover)
-  const hx = hover[pid];
+  const hx = hover[i];
   const [t, v] = hx == null ? pts.at(-1) : pts.reduce((a, b) => Math.abs(X(b[0]) - hx) < Math.abs(X(a[0]) - hx) ? b : a);
   const x = X(t), y = Y(v);
   if (hx != null) {
@@ -233,7 +267,7 @@ function chart(pid) {
   ctx.fillText(label, bx + 6, by + 10);
 }
 
-$('#win').onchange = () => charted.forEach(chart);
+$('#win').onchange = () => slots.forEach((_, i) => chart(i));
 
 $('#bCsv').onclick = () => {
   const csv = 'data_hora;pid;sensor;valor\n' + log.map(r => r.join(';')).join('\n');
@@ -318,7 +352,7 @@ $('#bClear').onclick = async () => {
 // ---- Sensores do fabricante (CSV) ----
 const CSV_KEY = 'obd-br.pids';
 function loadCustom(text, persist) {
-  for (const k of Object.keys(PIDS)) if (k.startsWith('X')) { delete PIDS[k]; delete hist[k]; delete last[k]; charted.delete(k); }
+  for (const k of Object.keys(PIDS)) if (k.startsWith('X')) { delete PIDS[k]; delete hist[k]; delete last[k]; }
   const { pids, errors } = text ? parseTorqueCsv(text) : { pids: [], errors: [] };
   for (const p of pids) PIDS[p.id] = p;
   if (persist) try { text ? localStorage.setItem(CSV_KEY, text) : localStorage.removeItem(CSV_KEY); } catch { /* armazenamento indisponível */ }
@@ -336,7 +370,8 @@ for (const b of document.querySelectorAll('nav button')) b.onclick = () => {
     o.setAttribute('aria-selected', o === b);
     $('#' + o.dataset.tab).hidden = o !== b;
   }
-  if (b.dataset.tab === 'graficos') charted.forEach(chart);
+  if (b.dataset.tab === 'graficos') slots.forEach((_, i) => chart(i));
 };
 
+renderCharts();
 render();
