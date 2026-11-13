@@ -76,15 +76,127 @@ for (let i = 1; i <= 8; i++) {
   D['P035' + i] = `Bobina de ignição ${i} - circuito`;
 }
 
+// Códigos específicos de fabricante (P1xxx). O significado pode mudar por modelo/ano/ECU,
+// por isso a interface marca a descrição como "do fabricante". Só entram códigos de fonte conhecida.
+// ponytail: tabelas curtas com os códigos mais vistos; ampliar com a lista da ECU do modelo quando houver.
+const MAKES = {
+  vw: { // VW / Audi (VAG): P1xxx = código VAG 17xxx - 17408
+    P1102: 'Aquecimento sonda lambda B1S1 - curto ao positivo',
+    P1105: 'Aquecimento sonda lambda B1S2 - curto ao positivo',
+    P1136: 'Adaptação de mistura (ar adicional) banco 1 - mistura muito pobre',
+    P1137: 'Adaptação de mistura (ar adicional) banco 1 - mistura muito rica',
+    P1138: 'Adaptação de mistura (ar adicional) banco 2 - mistura muito pobre',
+    P1139: 'Adaptação de mistura (ar adicional) banco 2 - mistura muito rica',
+    P1176: 'Correção da sonda pós-catalisador banco 1 - limite atingido',
+    P1250: 'Nível de combustível muito baixo',
+    P1296: 'Falha no sistema de arrefecimento',
+    P1297: 'Mangueira de pressão turbo-borboleta - vazamento/desconexão',
+    P1340: 'Sinais de rotação e fase fora de sequência (correia/corrente)',
+    P1386: 'Controle de detonação interno da ECU - falha',
+    P1425: 'Válvula do cânister - curto à massa',
+    P1545: 'Controle do corpo de borboleta - falha',
+    P1559: 'Marcha lenta / adaptação do corpo de borboleta - falha (fazer adaptação)',
+    P1565: 'Controle de marcha lenta - limite inferior não atingido',
+    P1570: 'ECU bloqueada pelo imobilizador',
+    P1602: 'Alimentação da ECU (borne 30) - tensão baixa',
+    P1612: 'Codificação incorreta da ECU',
+    P1626: 'CAN - falta mensagem do módulo de câmbio',
+    P1648: 'CAN do motor - falha',
+  },
+  gm: { // Chevrolet / GM
+    P1101: 'Sensor MAF fora da faixa de autoteste',
+    P1133: 'Sonda lambda B1S1 - comutações insuficientes',
+    P1134: 'Sonda lambda B1S1 - relação de tempo de transição',
+    P1171: 'Sistema de combustível pobre na aceleração',
+    P1336: 'Variação do sensor de rotação não aprendida (fazer aprendizado CKP)',
+    P1380: 'Falha de ignição - dados de estrada ruim indisponíveis',
+    P1381: 'Falha de ignição - sem comunicação com o módulo de freio',
+    P1406: 'Válvula EGR - circuito de posição',
+    P1516: 'Corpo de borboleta eletrônico - desempenho da posição',
+    P1626: 'Imobilizador - sinal de liberação de combustível não recebido',
+    P1631: 'Imobilizador - senha incorreta',
+  },
+  ford: {
+    P1000: 'Monitores OBD-II ainda não concluídos (normal após limpar códigos)',
+    P1001: 'Autoteste com motor ligado não concluído',
+    P1100: 'Sensor MAF - intermitente',
+    P1131: 'Sonda lambda B1S1 sem comutação - indica pobre',
+    P1132: 'Sonda lambda B1S1 sem comutação - indica rico',
+    P1151: 'Sonda lambda B2S1 sem comutação - indica pobre',
+    P1152: 'Sonda lambda B2S1 sem comutação - indica rico',
+    P1260: 'Roubo detectado - veículo imobilizado',
+    P1270: 'Limitador de rotação ou velocidade atingido',
+    P1285: 'Superaquecimento do cabeçote',
+    P1299: 'Proteção contra superaquecimento do cabeçote ativa',
+    P1351: 'Monitor de diagnóstico da ignição - circuito',
+    P1400: 'Sensor DPFE (EGR) - sinal baixo',
+    P1401: 'Sensor DPFE (EGR) - sinal alto',
+    P1450: 'Não foi possível gerar vácuo no tanque (EVAP)',
+    P1500: 'Sensor de velocidade - intermitente',
+    P1505: 'Válvula de marcha lenta (IAC) no limite de adaptação',
+    P1506: 'Marcha lenta acima do comandado',
+    P1507: 'Marcha lenta abaixo do comandado',
+    P1605: 'ECU - erro no teste da memória KAM',
+  },
+  toyota: {
+    P1120: 'Sensor do pedal do acelerador - circuito',
+    P1121: 'Sensor do pedal do acelerador - faixa/desempenho',
+    P1130: 'Sensor ar/combustível B1S1 - faixa/desempenho',
+    P1135: 'Aquecedor do sensor ar/combustível B1S1 - circuito',
+    P1300: 'Ignitor nº 1 - circuito',
+    P1335: 'Sem sinal do sensor de rotação com motor ligado',
+    P1346: 'Sensor do VVT - faixa/desempenho',
+    P1349: 'Sistema VVT - falha',
+    P1500: 'Sinal de partida - circuito',
+    P1520: 'Interruptor da luz de freio - sinal',
+    P1600: 'Alimentação permanente da ECU (BATT)',
+    P1656: 'Válvula de controle de óleo do VVT (OCV) - circuito',
+  },
+  honda: {
+    P1166: 'Aquecedor do sensor ar/combustível - sistema',
+    P1167: 'Aquecedor do sensor ar/combustível - circuito',
+    P1259: 'Sistema VTEC - falha',
+    P1297: 'Detector de carga elétrica (ELD) - sinal baixo',
+    P1298: 'Detector de carga elétrica (ELD) - sinal alto',
+    P1361: 'Sensor TDC - intermitente',
+    P1362: 'Sensor TDC - sem sinal',
+    P1381: 'Sensor de posição do cilindro - intermitente',
+    P1382: 'Sensor de posição do cilindro - sem sinal',
+    P1456: 'EVAP - vazamento no lado do tanque',
+    P1457: 'EVAP - vazamento no lado do cânister',
+    P1491: 'Válvula EGR - curso insuficiente',
+    P1607: 'ECU - falha de circuito interno',
+  },
+  nissan: {
+    P1148: 'Controle em malha fechada banco 1 - falha',
+    P1217: 'Superaquecimento do motor',
+    P1440: 'EVAP - vazamento pequeno',
+    P1446: 'Válvula de ventilação do cânister - fechada',
+    P1610: 'Imobilizador (NATS) - modo de bloqueio',
+    P1611: 'Imobilizador (NATS) - ID divergente entre ECU e imobilizador',
+    P1612: 'Imobilizador (NATS) - falha de comunicação ECU-imobilizador',
+    P1614: 'Imobilizador (NATS) - falha de comunicação com a chave',
+    P1615: 'Imobilizador (NATS) - chave não reconhecida',
+    P1805: 'Interruptor da luz de freio - circuito',
+  },
+  hyundai: {
+    P1326: 'Sistema de detecção de detonação (KSDS) - possível desgaste de bronzina, procure a concessionária',
+  },
+};
+export const MAKE_NAMES = { vw: 'VW / Audi', gm: 'Chevrolet / GM', ford: 'Ford', fiat: 'Fiat / Jeep', toyota: 'Toyota',
+  honda: 'Honda', renault: 'Renault', nissan: 'Nissan', hyundai: 'Hyundai / Kia', psa: 'Peugeot / Citroën' };
+
 const SYS = {
   B: 'Carroceria', C: 'Chassi', U: 'Rede de comunicação',
   P: ['Combustível e ar', 'Combustível e ar', 'Injeção', 'Ignição / falha de combustão', 'Controle de emissões',
     'Velocidade e marcha lenta', 'ECU e saídas', 'Transmissão', 'Transmissão', 'Transmissão'],
 };
 
-export function describe(code) {
-  if (D[code]) return D[code];
+// -> { text, own } ; own = true quando a descrição veio da tabela do fabricante ou o código é do fabricante.
+export function describe(code, make = '') {
+  if (D[code]) return { text: D[code], own: false };
+  if (MAKES[make]?.[code]) return { text: MAKES[make][code], own: true };
   const sys = code[0] === 'P' ? SYS.P[code[2]] ?? 'Trem de força' : SYS[code[0]];
-  const own = code[1] === '1' || code[1] === '3' ? ' - código específico do fabricante' : '';
-  return `${sys}${own}`;
+  const own = code[1] === '1' || code[1] === '3';
+  return { text: sys + (own ? ' - código do fabricante (consulte o manual de serviço)' : ''), own };
 }
