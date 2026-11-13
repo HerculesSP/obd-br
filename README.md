@@ -52,20 +52,28 @@ No Android só funciona BLE. Adaptadores de Bluetooth clássico não aparecem no
 - **Veículo**: mostra o chassi (VIN, modo 09), o fabricante, o país, o ano-modelo, o odômetro (PID A6, só em centrais recentes), a distância rodada desde a limpeza dos códigos e com a luz acesa, e a viagem atual calculada pela velocidade.
   - A quilometragem do painel fica no módulo do painel de instrumentos, que não é acessível pelo OBD genérico. Carros antes de 2019 dificilmente informam o odômetro.
 
-## Sensores do fabricante (importação CSV)
+## Sensores do fabricante
 
-Em **Veículo → Sensores do fabricante**, importe uma lista no formato CSV do **Torque Pro**:
+Em **Veículo → Sensores do fabricante**, escolha **marca, modelo e ano**. O ano é preenchido pelo chassi. O app baixa a lista de sensores daquele carro e, com o carro conectado, **testa quais ele responde** e mantém só esses. Na prática, isso também filtra pelo motor, porque sinais de outro motor não respondem.
+
+Fontes do catálogo (`catalog.json`, ~430 modelos):
+
+- **[OBDb](https://github.com/OBDb)**: base comunitária aberta (CC BY-SA 4.0), baixada direto do GitHub na hora. Tem bons dados para VW (Polo, Virtus, T-Cross, Taos, Jetta, Up), Toyota (Corolla, Corolla Cross, Hilux, Yaris), Honda (Civic, Fit, HR-V, City), Hyundai/Kia, Ford (EcoSport, Ranger, Maverick), Chevrolet (S10, Tracker, Cruze), Jeep (Renegade, Compass), Nissan (Kicks, Versa), Peugeot 208/3008 e outros. Ainda não tem Onix, HB20, Strada, Argo, Mobi nem Kwid.
+  - Sinais marcados com **?** não foram confirmados pela comunidade para aquele ano-modelo. Confira se os valores fazem sentido.
+- **Listas Torque públicas** do GitHub: Prius NHW20, motores Renault K9K, Golf 7 GTD, VW MQB TSI.
+- **Comunidade (`pids/`)**: listas enviadas por pull request (veja `pids/README.md`).
+
+Também dá para importar um CSV próprio no formato do **Torque Pro**:
 
 ```csv
 Name,ShortName,ModeAndPID,Equation,Min Value,Max Value,Units,Header
 Temp. fluido do câmbio,ATF,0x221940,A-40,-40,150,°C,7E1
 ```
 
-- `ModeAndPID`: modo + PID (ex.: `221940` = serviço 22, identificador 1940).
-- `Equation`: `A`, `B`… são os bytes da resposta (`AA` = 27º byte). Aceita `+ - * / ( )`, `{A:7}` (bit 7 de A), `Signed(A)`, `INT()`, `ABS()`. Outros tokens são rejeitados, então o arquivo não executa código.
-- `Header`: endereço do módulo (ex.: `7E1` = câmbio). Em branco = central do motor.
+- `Equation`: `A`, `B`… (ou minúsculas) são os bytes da resposta. Aceita `+ - * / & | >> << ( )`, `{A:7}`, `Signed(A)`, `INT()`, `ABS()`. Qualquer outra coisa é rejeitada, então o arquivo não executa código.
+- `Header`: endereço do módulo (`7E1` = câmbio; 4 dígitos = CAN 29 bits, ex.: `DA10`).
 
-Os sensores importados aparecem no Painel e nos gráficos e ficam salvos no navegador. Listas por modelo circulam em fóruns e grupos (procure por "<modelo> torque pids csv"). O arquivo `exemplo-pids.csv` só mostra o formato e funciona no modo demo. Para ler outros módulos, o adaptador precisa aceitar `ATSH`/`ATCRA`; clones baratos às vezes não aceitam.
+Para ler outros módulos, o adaptador precisa aceitar `ATSH`, `ATCRA` e `ATTP`; clones muito baratos às vezes não aceitam.
 
 ## Testes
 
@@ -77,6 +85,7 @@ node test.mjs
 
 - `obd.js`: ELM327, tabela de PIDs, parsers e transportes (Serial, BLE e simulador)
 - `dtc.js`: descrições de DTC em português
-- `custom.js`: importação de CSV do Torque e avaliador de fórmulas
+- `custom.js`: importação de CSV do Torque, avaliador de fórmulas e conversor do OBDb
+- `catalog.json`, `pids/`: catálogo de modelos e listas da comunidade
 - `app.js` / `index.html`: interface
 - `manifest.webmanifest`, `sw.js`, `icon*`: PWA (instalável e offline)

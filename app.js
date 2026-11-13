@@ -1,13 +1,13 @@
 import { Elm, PIDS, SerialTransport, BleTransport, DemoTransport, decodeVin } from './obd.js';
 import { describe, MAKE_NAMES } from './dtc.js';
-import { parseTorqueCsv } from './custom.js';
+import { parseTorqueCsv, parseObdb } from './custom.js';
 
 const $ = s => document.querySelector(s);
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const GAUGES = { '0C': 6000, '0D': null, '05': 105 }; // PID -> início da faixa vermelha
 const MAX_LOG = 200000; // ponytail: log em memória; gravar em IndexedDB se sessões longas importarem
 
-let elm = null, running = false, supported = [];
+let elm = null, running = false, probing = false, supported = [];
 const hist = {}, last = {}, log = [], hover = {};
 let trip = 0, fuelUsed = 0, lastSpeed = null;
 
@@ -63,6 +63,7 @@ async function connect(t) {
     status(`${info.version} · ${info.protocol} · bateria ${info.voltage} · ${supported.length} sensores`);
     buildTiles();
     await readVehicle();
+    await probeCustom();
     navigator.wakeLock?.request('screen').catch(() => {});
     running = true;
     loop();
@@ -92,6 +93,7 @@ function setConnected(on) {
 async function loop() {
   let i = 0;
   while (running) {
+    if (probing) { await new Promise(r => setTimeout(r, 200)); continue; }
     const sensors = supported.filter(p => !PIDS[p].derive), on = charted();
     const fast = sensors.filter(p => on.has(p) || p in GAUGES || CALC_DEPS.includes(p));
     const slow = sensors.filter(p => !fast.includes(p));
@@ -116,6 +118,7 @@ async function readVehicle() {
   $('#vCountry').textContent = d.country;
   $('#vYear').textContent = d.year ?? '—';
   if (d.make) $('#make').value = d.make;
+  if (d.year && !$('#cYear').value) $('#cYear').value = d.year;
 }
 
 const km = v => v == null ? '—' : v.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' km';
@@ -142,7 +145,7 @@ function buildTiles() {
     const b = document.createElement('div');
     b.className = 'tile' + (PIDS[pid].derive ? ' on' : '');
     b.id = 't' + pid;
-    b.innerHTML = `<small>${esc(PIDS[pid].name)}</small><b>—</b><span>${esc(PIDS[pid].unit)}</span>`;
+    b.innerHTML = `<small>${esc(PIDS[pid].name)}${PIDS[pid].unverified ? ' <span class="badge pending" title="Ainda não confirmado na base OBDb para este ano-modelo">?</span>' : ''}</small><b>—</b><span>${esc(PIDS[pid].unit)}</span>`;
     return b;
   }));
   renderCharts();
@@ -349,20 +352,79 @@ $('#bClear').onclick = async () => {
   $('#dtcOut').textContent = 'Códigos apagados. Leia novamente para confirmar.';
 };
 
-// ---- Sensores do fabricante (CSV) ----
-const CSV_KEY = 'obd-br.pids';
-function loadCustom(text, persist) {
+// ---- Sensores do fabricante: catálogo (OBDb / listas Torque) ou CSV próprio ----
+// Fonte salva: { label, obdb, year } | { label, csv (url), source } | { label, text (arquivo importado) }
+let catalog = [], customInfo = '';
+
+function setCustom(pids, info, errors = []) {
   for (const k of Object.keys(PIDS)) if (k.startsWith('X')) { delete PIDS[k]; delete hist[k]; delete last[k]; }
-  const { pids, errors } = text ? parseTorqueCsv(text) : { pids: [], errors: [] };
   for (const p of pids) PIDS[p.id] = p;
-  if (persist) try { text ? localStorage.setItem(CSV_KEY, text) : localStorage.removeItem(CSV_KEY); } catch { /* armazenamento indisponível */ }
-  $('#csvOut').innerHTML = (pids.length ? `${pids.length} sensor(es): ${pids.map(p => esc(p.name)).join(', ')}` : 'Nenhum sensor importado.')
-    + errors.map(e => `<br><span class="warn">${esc(e)}</span>`).join('');
-  if (elm) { supported = [...supported.filter(p => !p.startsWith('X')), ...pids.map(p => p.id)]; buildTiles(); }
+  const unv = pids.filter(p => p.unverified).length;
+  customInfo = pids.length ? `${info}: ${pids.length} sensor(es) na lista${unv ? ` (${unv} não verificados para este ano, marcados com ?)` : ''}.` : '';
+  $('#csvOut').innerHTML = esc(customInfo || 'Nenhum sensor do fabricante carregado.') + errors.slice(0, 5).map(e => `<br><span class="warn">${esc(e)}</span>`).join('');
+  if (elm) { supported = [...supported.filter(p => !p.startsWith('X')), ...pids.map(p => p.id)]; buildTiles(); probeCustom(); }
 }
-try { loadCustom(localStorage.getItem(CSV_KEY)); } catch { loadCustom(null); }
-$('#csv').onchange = async e => { const f = e.target.files[0]; if (f) loadCustom(await f.text(), true); e.target.value = ''; };
-$('#bCsvClear').onclick = () => loadCustom(null, true);
+
+async function loadSource(src, persist) {
+  try {
+    $('#csvOut').textContent = 'Baixando lista de sensores…';
+    if (src.obdb) {
+      const r = await fetch(`https://raw.githubusercontent.com/OBDb/${src.obdb}/HEAD/signalsets/v3/default.json`);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      setCustom(parseObdb(await r.json(), src.year), src.label);
+    } else {
+      const text = src.text ?? await (await fetch(src.csv)).text();
+      const { pids, errors } = parseTorqueCsv(text);
+      setCustom(pids, src.label, errors);
+    }
+    if (persist) save('custom', src);
+  } catch (e) {
+    $('#csvOut').innerHTML = `<span class="warn">Não foi possível carregar a lista (${esc(e.message)}). Verifique a internet.</span>`;
+  }
+}
+
+// Testa uma vez cada comando (vários sensores compartilham o mesmo) e mantém só os que o carro responde.
+async function probeCustom() {
+  const custom = supported.filter(p => p.startsWith('X'));
+  if (!elm || !custom.length || probing) return;
+  probing = true;
+  const groups = Object.groupBy(custom, p => PIDS[p].header + PIDS[p].cmd), keep = [];
+  let n = 0;
+  for (const ids of Object.values(groups)) {
+    $('#csvOut').textContent = `${customInfo} Testando no seu carro… ${++n}/${Object.keys(groups).length}`;
+    const vals = [];
+    for (const p of ids) vals.push(await elm.read(p).catch(() => null));
+    ids.forEach((p, i) => { if (vals.some(v => v != null)) { keep.push(p); if (vals[i] != null) record(p, vals[i]); } });
+  }
+  supported = [...supported.filter(p => !p.startsWith('X')), ...keep];
+  $('#csvOut').textContent = `${customInfo} ${keep.length} responderam no seu carro e foram adicionados ao Painel e aos gráficos.`;
+  probing = false;
+  buildTiles();
+}
+
+const byMake = () => catalog.filter(e => e.make === $('#cMake').value);
+$('#cMake').onchange = () => {
+  $('#cModel').replaceChildren(new Option('Modelo…', ''), ...byMake().map((e, i) => new Option(e.model, i)));
+};
+$('#bLoad').onclick = () => {
+  const e = byMake()[$('#cModel').value], year = +$('#cYear').value || null;
+  if (!e) return void ($('#csvOut').textContent = 'Escolha a marca e o modelo.');
+  const label = `${e.make} ${e.model}${year && e.obdb ? ' ' + year : ''}`;
+  loadSource(e.obdb ? { label, obdb: e.obdb, year } : { label, csv: e.csv, source: e.source }, true);
+};
+$('#csv').onchange = async e => {
+  const f = e.target.files[0];
+  if (f) loadSource({ label: f.name, text: await f.text() }, true);
+  e.target.value = '';
+};
+$('#bCsvClear').onclick = () => { setCustom([], ''); save('custom', null); };
+
+fetch('catalog.json').then(r => r.json()).then(c => {
+  catalog = c;
+  for (const m of [...new Set(c.map(e => e.make))]) $('#cMake').add(new Option(m, m));
+}).catch(() => {});
+const saved = pref('custom', null);
+if (saved) loadSource(saved); else setCustom([], '');
 
 // ---- Abas ----
 for (const b of document.querySelectorAll('nav button')) b.onclick = () => {

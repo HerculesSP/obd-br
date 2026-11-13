@@ -28,7 +28,7 @@
   body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 system-ui, sans-serif; }
   header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
   h1 { font-size: 18px; margin: 0 12px 0 0; }
-  button, select, label.btn { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+  button, select, input, label.btn { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
   button:hover:not(:disabled) { border-color: var(--series); }
   button:disabled { opacity: .45; cursor: not-allowed; }
   button.primary { background: var(--series); border-color: var(--series); color: #fff; }
@@ -140,10 +140,17 @@
       </select></label></p>
     <p class="hint">O odômetro só aparece em carros cuja central informa o PID A6 (geralmente modelos recentes). A quilometragem do painel fica no módulo do painel de instrumentos, que não é acessível pelo OBD genérico.</p>
     <h3>Sensores do fabricante</h3>
-    <p class="hint">Importe uma lista de PIDs no formato CSV do Torque Pro (colunas Name, ShortName, ModeAndPID, Equation, Min, Max, Units, Header), como as que circulam por modelo de carro. Os sensores aparecem no Painel e podem ir para os gráficos. <a href="exemplo-pids.csv" download>Baixar exemplo</a></p>
+    <p class="hint">Escolha o carro para baixar os sensores específicos dele: câmbio, injeção, freios, pneus etc. A fonte é a base comunitária <a href="https://github.com/OBDb" target="_blank" rel="noopener">OBDb</a> (licença CC BY-SA 4.0) ou listas públicas no formato do Torque. Com o carro conectado, o app testa quais sensores o seu carro responde e mostra só esses; isso também filtra pelo motor.</p>
+    <div class="row">
+      <select id="cMake" aria-label="Marca"><option value="">Marca…</option></select>
+      <select id="cModel" aria-label="Modelo"><option value="">Modelo…</option></select>
+      <input id="cYear" type="number" min="1996" max="2035" placeholder="Ano" aria-label="Ano-modelo" style="width: 96px">
+      <button id="bLoad" class="primary">Carregar</button>
+    </div>
+    <p class="hint">Ou importe um arquivo CSV no formato do Torque Pro (colunas Name, ShortName, ModeAndPID, Equation, Min, Max, Units, Header). <a href="exemplo-pids.csv" download>Baixar exemplo</a></p>
     <div class="row">
       <label class="btn">📂 Importar CSV<input type="file" id="csv" accept=".csv,text/csv" hidden></label>
-      <button id="bCsvClear">Remover todos</button>
+      <button id="bCsvClear">Remover sensores do fabricante</button>
     </div>
     <p id="csvOut" class="hint"></p>
   </section>
