@@ -226,6 +226,11 @@ export class DemoTransport {
       '52': [Math.round(255 * 0.62)],
       '5E': [0, Math.round(20 * (1 + 10 * w(5)))],
       '10': [0, Math.round(rpm / 15)],
+      '06': [Math.round(128 + 8 * Math.sin(s))],
+      '07': [131],
+      '0B': [Math.round(35 + 50 * w(5))],
+      '0F': [72], '46': [66], '5C': [Math.round(40 + Math.min(95, 20 + s * 1.5))],
+      '33': [93], '21': [0, 0], '31': [0x04, 0xb0], '1F': [s >> 8 & 255, s & 255],
     }[pid] ?? [Math.round(255 * w(3 + parseInt(pid, 16) % 7, 0.3)), 0];
     return '41' + pid + b.map(x => Math.max(0, Math.min(255, x | 0)).toString(16).toUpperCase().padStart(2, '0')).join('');
   }
