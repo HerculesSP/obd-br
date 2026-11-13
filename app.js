@@ -1,5 +1,6 @@
 import { Elm, PIDS, SerialTransport, BleTransport, DemoTransport, decodeVin } from './obd.js';
 import { describe, MAKE_NAMES } from './dtc.js';
+import { parseTorqueCsv } from './custom.js';
 
 const $ = s => document.querySelector(s);
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
@@ -15,7 +16,8 @@ navigator.serviceWorker?.register('sw.js').catch(() => {});
 for (const [k, v] of Object.entries(MAKE_NAMES)) $('#make').add(new Option(v, k));
 
 const status = s => { $('#status').textContent = s; };
-const DP = { V: 2, 'g/s': 1, 'L/h': 1 };
+const DP = { V: 2, 'g/s': 1, 'L/h': 1, 'λ': 3 };
+const esc = s => String(s).replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
 const fmt = (pid, v) => typeof v === 'string' ? v : v.toFixed(DP[PIDS[pid].unit] ?? 0);
 
 // ---- Conexão ----
@@ -33,7 +35,7 @@ async function connect(t) {
     elm = new Elm(t);
     status('Inicializando ELM327 e procurando protocolo (K-line pode levar até 15 s)…');
     const info = await elm.init($('#proto').value);
-    supported = info.supported;
+    supported = [...info.supported, ...Object.keys(PIDS).filter(k => k.startsWith('X'))];
     status(`${info.version} · ${info.protocol} · bateria ${info.voltage} · ${supported.length} sensores`);
     buildTiles();
     await readVehicle();
@@ -109,7 +111,7 @@ function buildTiles() {
     const b = document.createElement('button');
     b.className = 'tile' + (charted.has(pid) ? ' on' : '');
     b.id = 't' + pid;
-    b.innerHTML = `<small>${PIDS[pid].name}</small><b>—</b><span>${PIDS[pid].unit}</span>`;
+    b.innerHTML = `<small>${esc(PIDS[pid].name)}</small><b>—</b><span>${esc(PIDS[pid].unit)}</span>`;
     b.onclick = () => {
       if (PIDS[pid].text) return;
       charted.has(pid) ? charted.delete(pid) : charted.add(pid);
@@ -172,7 +174,7 @@ function renderCharts() {
   $('#charts').replaceChildren(...list.map(pid => {
     const d = document.createElement('div');
     d.className = 'chart';
-    d.innerHTML = `<h3>${PIDS[pid].name} <span class="hint">(${PIDS[pid].unit})</span></h3><canvas id="c${pid}" role="img" aria-label="Gráfico de ${PIDS[pid].name}"></canvas>`;
+    d.innerHTML = `<h3>${esc(PIDS[pid].name)} <span class="hint">(${esc(PIDS[pid].unit)})</span></h3><canvas id="c${pid}" role="img" aria-label="Gráfico de ${esc(PIDS[pid].name)}"></canvas>`;
     const cv = d.querySelector('canvas');
     cv.onpointermove = e => { hover[pid] = e.offsetX; chart(pid); };
     cv.onpointerleave = () => { delete hover[pid]; chart(pid); };
@@ -244,24 +246,89 @@ $('#bCsv').onclick = () => {
 // ---- Códigos de erro ----
 const KINDS = [['03', 'stored', 'Armazenado'], ['07', 'pending', 'Pendente'], ['0A', 'permanent', 'Permanente']];
 
-$('#bRead').onclick = async () => {
-  $('#dtcOut').textContent = 'Lendo…';
-  const rows = [];
-  for (const [mode, cls, label] of KINDS)
-    for (const code of await elm.dtcs(mode)) {
-      const d = describe(code, $('#make').value);
-      rows.push(`<tr><td class="code">${code}</td><td>${d.text}</td><td><span class="badge ${cls}">${label}</span>${d.own ? ' <span class="badge own" title="O significado pode variar por modelo e ano">Fabricante</span>' : ''}</td></tr>`);
-    }
-  $('#dtcOut').innerHTML = rows.length
-    ? `<table><tr><th>Código</th><th>Descrição</th><th>Tipo</th></tr>${rows.join('')}</table>`
-    : '<p class="ok">✔ Nenhum código de falha encontrado.</p>';
+const dtcCell = code => {
+  const d = describe(code, $('#make').value);
+  return `<td class="code">${code}</td><td>${d.text}${d.own ? ' <span class="badge own" title="O significado pode variar por modelo e ano">Fabricante</span>' : ''}</td>`;
 };
+
+$('#bRead').onclick = async () => {
+  const parts = [];
+  const step = s => { $('#dtcOut').innerHTML = parts.join('') + `<p class="hint">${s}</p>`; };
+  $('#bRead').disabled = true;
+  try {
+    step('Lendo códigos de falha…');
+    const rows = [];
+    for (const [mode, cls, label] of KINDS)
+      for (const code of await elm.dtcs(mode)) rows.push(`<tr>${dtcCell(code)}<td><span class="badge ${cls}">${label}</span></td></tr>`);
+    parts.push('<h3>Códigos de falha</h3>' + (rows.length
+      ? `<table><tr><th>Código</th><th>Descrição</th><th>Tipo</th></tr>${rows.join('')}</table>`
+      : '<p class="ok">✔ Nenhum código de falha encontrado.</p>'));
+
+    step('Lendo monitores de prontidão…');
+    const st = await elm.status();
+    if (st) parts.push(readinessHtml(st, await elm.read('31'), await elm.read('30')));
+
+    step('Lendo dados congelados…');
+    const ff = await elm.freeze();
+    if (ff) parts.push(`<h3>Dados congelados (momento da falha ${ff.code})</h3><table>${dtcRowFF(ff)}</table>`);
+
+    if (elm.isCan) {
+      step('Lendo falhas de ignição por cilindro…');
+      const mf = await elm.misfires();
+      if (mf?.length) parts.push(misfireHtml(mf));
+    }
+    step('');
+  } catch (e) {
+    step('Erro: ' + esc(e.message));
+  }
+  $('#bRead').disabled = !elm;
+};
+
+function readinessHtml(st, km, warm) {
+  const bad = st.monitors.filter(m => !m.complete);
+  const recent = (km != null && km < 100) || (warm != null && warm < 20);
+  const since = [km != null && `${Math.round(km)} km`, warm != null && `${warm} partidas a frio`].filter(Boolean).join(' e ');
+  return `<h3>Estado e prontidão</h3>
+    <p>${st.mil ? '<span class="badge stored">● Luz de injeção ACESA</span>' : '<span class="ok">✔ Luz de injeção apagada</span>'}
+      · ${st.count} código(s) confirmado(s) · ${st.diesel ? 'Diesel' : 'Gasolina / etanol / flex'}</p>
+    ${bad.length >= 2 || recent ? `<p class="warn">⚠ Indício de códigos apagados recentemente: ${bad.length} monitor(es) incompleto(s)${since ? `, ${since} desde a limpeza` : ''}. Ao comprar usado, desconfie e peça para rodar mais antes de avaliar.</p>` : ''}
+    <table><tr><th>Monitor</th><th>Estado</th></tr>${st.monitors.map(m =>
+      `<tr><td>${m.name}</td><td>${m.complete ? '<span class="ok">✔ Completo</span>' : '<span class="badge pending">✖ Incompleto</span>'}</td></tr>`).join('')}</table>`;
+}
+
+const dtcRowFF = ff => `<tr><th>Sensor</th><th>Valor</th></tr>` + ff.values.map(([p, v]) =>
+  `<tr><td>${esc(PIDS[p].name)}</td><td class="code">${fmt(p, v)} <span class="hint">${esc(PIDS[p].unit)}</span></td></tr>`).join('');
+
+function misfireHtml(mf) {
+  const max = Math.max(1, ...mf.flatMap(m => [m.cur ?? 0, m.avg ?? 0]));
+  const total = mf.reduce((s, m) => s + (m.cur ?? 0), 0);
+  return `<h3>Falhas de ignição por cilindro</h3>
+    <p class="hint">${total ? 'Contagem do ciclo de condução atual (barra) e média dos últimos ciclos.' : '✔ Nenhuma falha registrada no ciclo atual.'}</p>
+    ${mf.map(m => `<div class="cyl"><span>Cilindro ${m.cyl}</span>
+      <div class="track"><div class="bar" style="width:${(m.cur ?? 0) / max * 100}%"></div></div>
+      <span class="code">${m.cur ?? '—'}</span><span class="hint">média ${m.avg ?? '—'}</span></div>`).join('')}`;
+}
 
 $('#bClear').onclick = async () => {
   if (!confirm('Apagar os códigos e a luz de injeção? Faça com a ignição ligada e o motor desligado. Os dados de prontidão (readiness) também serão zerados.')) return;
   await elm.clearDtcs();
   $('#dtcOut').textContent = 'Códigos apagados. Leia novamente para confirmar.';
 };
+
+// ---- Sensores do fabricante (CSV) ----
+const CSV_KEY = 'obd-br.pids';
+function loadCustom(text, persist) {
+  for (const k of Object.keys(PIDS)) if (k.startsWith('X')) { delete PIDS[k]; delete hist[k]; delete last[k]; charted.delete(k); }
+  const { pids, errors } = text ? parseTorqueCsv(text) : { pids: [], errors: [] };
+  for (const p of pids) PIDS[p.id] = p;
+  if (persist) try { text ? localStorage.setItem(CSV_KEY, text) : localStorage.removeItem(CSV_KEY); } catch { /* armazenamento indisponível */ }
+  $('#csvOut').innerHTML = (pids.length ? `${pids.length} sensor(es): ${pids.map(p => esc(p.name)).join(', ')}` : 'Nenhum sensor importado.')
+    + errors.map(e => `<br><span class="warn">${esc(e)}</span>`).join('');
+  if (elm) { supported = [...supported.filter(p => !p.startsWith('X')), ...pids.map(p => p.id)]; buildTiles(); }
+}
+try { loadCustom(localStorage.getItem(CSV_KEY)); } catch { loadCustom(null); }
+$('#csv').onchange = async e => { const f = e.target.files[0]; if (f) loadCustom(await f.text(), true); e.target.value = ''; };
+$('#bCsvClear').onclick = () => loadCustom(null, true);
 
 // ---- Abas ----
 for (const b of document.querySelectorAll('nav button')) b.onclick = () => {

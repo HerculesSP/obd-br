@@ -28,7 +28,7 @@
   body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 system-ui, sans-serif; }
   header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
   h1 { font-size: 18px; margin: 0 12px 0 0; }
-  button, select { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+  button, select, label.btn { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
   button:hover:not(:disabled) { border-color: var(--series); }
   button:disabled { opacity: .45; cursor: not-allowed; }
   button.primary { background: var(--series); border-color: var(--series); color: #fff; }
@@ -62,6 +62,12 @@
   .badge.permanent { color: var(--text2); }
   .ok { color: var(--good); }
   .badge.own { color: var(--series); }
+  .warn { color: var(--warning); }
+  a { color: var(--series); }
+  h3 { font-size: 16px; margin: 20px 0 8px; }
+  .cyl { display: grid; grid-template-columns: 90px 1fr 40px 80px; gap: 10px; align-items: center; padding: 4px 0; }
+  .track { height: 10px; background: var(--line); border-radius: 5px; }
+  .bar { height: 100%; background: var(--series); border-radius: 5px; min-width: 2px; }
   dl { display: grid; grid-template-columns: max-content 1fr; gap: 10px 20px; margin: 0; }
   dt { color: var(--text2); }
   dd { margin: 0; font: 600 17px ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
@@ -126,6 +132,13 @@
       <dt>Viagem atual (calculada pela velocidade)</dt><dd id="vTrip">—</dd>
     </dl>
     <p class="hint">O odômetro só aparece em carros cuja central informa o PID A6 (geralmente modelos recentes). A quilometragem do painel fica no módulo do painel de instrumentos, que não é acessível pelo OBD genérico.</p>
+    <h3>Sensores do fabricante</h3>
+    <p class="hint">Importe uma lista de PIDs no formato CSV do Torque Pro (colunas Name, ShortName, ModeAndPID, Equation, Min, Max, Units, Header), como as que circulam por modelo de carro. Os sensores aparecem no Painel e podem ir para os gráficos. <a href="exemplo-pids.csv" download>Baixar exemplo</a></p>
+    <div class="row">
+      <label class="btn">📂 Importar CSV<input type="file" id="csv" accept=".csv,text/csv" hidden></label>
+      <button id="bCsvClear">Remover todos</button>
+    </div>
+    <p id="csvOut" class="hint"></p>
   </section>
 </main>
 <script type="module" src="app.js"></script>
